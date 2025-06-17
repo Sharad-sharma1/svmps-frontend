@@ -57,8 +57,7 @@ Frontend: 3000
 Modify .env files or configuration as needed for your environment.
 
 📁 Project Structure
-php
-project-root/
+svmps_frontend/
 │
 ├── backend/
 │   ├── env_be/                # Python virtual environment (excluded from Git)

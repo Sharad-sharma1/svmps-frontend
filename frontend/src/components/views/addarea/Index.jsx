@@ -13,7 +13,7 @@ const Addarea = () => {
   // Fetch areas from backend
   const fetchAreas = async (page = 1, searchValue = "") => {
     try {
-      const response = await axios.get("http://localhost:8001/area/", {
+      const response = await axios.get("https://svmps-frontend.onrender.com/area/", {
         params: {
           page_num: page,
           area: searchValue || undefined
@@ -33,7 +33,7 @@ const Addarea = () => {
   const handleAddArea = async () => {
     if (newArea.trim()) {
       try {
-        await axios.post("http://localhost:8001/area/", {
+        await axios.post("axios.get/area/", {
           area: newArea.trim(),
         });
         setNewArea("");

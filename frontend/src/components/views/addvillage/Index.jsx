@@ -12,7 +12,7 @@ const Addvillage = () => {
 
   const fetchVillages = async (page = 1, searchValue = "") => {
     try {
-      const response = await axios.get("http://localhost:8001/village/", {
+      const response = await axios.get("https://svmps-frontend.onrender.com/village/", {
         params: {
           page_num: page,
           village: searchValue || undefined,
@@ -32,7 +32,7 @@ const Addvillage = () => {
   const handleAddVillage = async () => {
     if (newVillage.trim()) {
       try {
-        await axios.post("http://localhost:8001/village/", {
+        await axios.post("https://svmps-frontend.onrender.com/village/", {
           village: newVillage.trim(),
         });
         setNewVillage("");
@@ -45,7 +45,7 @@ const Addvillage = () => {
 
   const handleDeleteVillage = async (id) => {
     try {
-      await axios.delete(`http://localhost:8001/village/${id}`);
+      await axios.delete(`https://svmps-frontend.onrender.com/village/${id}`);
       fetchVillages(currentPage, search);
     } catch (error) {
       alert("Error deleting village.");

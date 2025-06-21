@@ -22,8 +22,8 @@ Install the required dependencies:
 pip install -r requirements.txt
 Run the FastAPI server with Uvicorn:
 
-uvicorn main:app --reload --port 8001
-The backend will be accessible at: http://localhost:8001
+uvicorn main:app --reload --port 8002
+The backend will be accessible at: https://svmps-frontend.onrender.com
 
 --------------------------------------------------------------------------------
 
@@ -50,7 +50,7 @@ Make sure to activate the Python environment every time before running the backe
 
 Default ports:
 
-Backend: 8001
+Backend: 8002
 
 Frontend: 3000
 

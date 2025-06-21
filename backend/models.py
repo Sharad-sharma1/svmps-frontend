@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Date, DECIMAL, TIMESTAMP, Boolean, ForeignKey, func
+from sqlalchemy import Column, Integer, String, DateTime, DECIMAL, Date, Boolean, ForeignKey, func
 from sqlalchemy.orm import relationship, validates
 from database import Base  # Ensure your `Base = declarative_base()` is defined in this module
+from datetime import datetime
 
 
 class BaseModel(Base):
@@ -24,12 +25,10 @@ class Area(BaseModel):
     area_id = Column(Integer, primary_key=True, index=True)
     area = Column(String(50), unique=True, nullable=False)
 
-
-class User(Base):
+class User(BaseModel):
     __tablename__ = "user"
 
     user_id = Column(Integer, primary_key=True, autoincrement=True)
-
     usercode = Column(String(50))
     name = Column(String(100))
     surname = Column(String(100))
@@ -41,8 +40,8 @@ class User(Base):
     mobile_no1 = Column(String(15))
     mobile_no2 = Column(String(15))
 
-    fk_area_id = Column(Integer, ForeignKey("area.area_id"), nullable=True)
-    fk_village_id = Column(Integer, ForeignKey("village.village_id"), nullable=True)
+    fk_area_id = Column(Integer, ForeignKey("area.area_id"))
+    fk_village_id = Column(Integer, ForeignKey("village.village_id"))
 
     area = relationship("Area", backref="users")
     village = relationship("Village", backref="users")
@@ -63,5 +62,5 @@ class User(Base):
     receipt_date = Column(Date)
     receipt_amt = Column(DECIMAL(10, 2))
 
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    modified_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=datetime.utcnow)
+    modified_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

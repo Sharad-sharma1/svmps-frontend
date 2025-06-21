@@ -10,14 +10,13 @@ const Addarea = () => {
   const [totalCount, setTotalCount] = useState(0);
   const areasPerPage = 10;
 
-  // Fetch areas from backend
   const fetchAreas = async (page = 1, searchValue = "") => {
     try {
       const response = await axios.get("https://svmps-frontend.onrender.com/area/", {
         params: {
           page_num: page,
-          area: searchValue || undefined
-        }
+          area: searchValue || undefined,
+        },
       });
       setAreas(response.data.data);
       setTotalCount(response.data.total_count);
@@ -33,7 +32,7 @@ const Addarea = () => {
   const handleAddArea = async () => {
     if (newArea.trim()) {
       try {
-        await axios.post("axios.get/area/", {
+        await axios.post("https://svmps-frontend.onrender.com/area/", {
           area: newArea.trim(),
         });
         setNewArea("");
@@ -41,6 +40,15 @@ const Addarea = () => {
       } catch (error) {
         alert(error.response?.data?.detail || "Error adding area.");
       }
+    }
+  };
+
+  const handleDeleteArea = async (id) => {
+    try {
+      await axios.delete(`https://svmps-frontend.onrender.com/area/${id}`);
+      fetchAreas(currentPage, search);
+    } catch (error) {
+      alert("Error deleting area.");
     }
   };
 
@@ -78,6 +86,12 @@ const Addarea = () => {
             areas.map((area) => (
               <li key={area.area_id} className="area-item">
                 {area.area}
+                <button
+                  className="delete-button"
+                  onClick={() => handleDeleteArea(area.area_id)}
+                >
+                  ❌
+                </button>
               </li>
             ))
           ) : (

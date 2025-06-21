@@ -13,6 +13,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://sharad-sharma1.github.io",
+        "http://localhost:5173",
         "http://localhost:3000",  # optional: for local dev
     ],
     allow_credentials=True,

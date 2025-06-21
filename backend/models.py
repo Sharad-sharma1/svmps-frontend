@@ -62,5 +62,5 @@ class User(BaseModel):
     receipt_date = Column(Date)
     receipt_amt = Column(DECIMAL(10, 2))
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    modified_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # created_at = Column(DateTime, default=datetime.utcnow)
+    # modified_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

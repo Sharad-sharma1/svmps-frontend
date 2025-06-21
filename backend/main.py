@@ -11,11 +11,15 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://sharad-sharma1.github.io",
+        "http://localhost:3000",  # optional: for local dev
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Create tables on startup
 models.Base.metadata.create_all(bind=engine)

@@ -1,15 +1,12 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-#local 
-# URL_DATABASE = 'mysql+pymysql://root:root@localhost:3306/myapp'
+DATABASE_URL = (
+    "postgresql+psycopg2://neondb_owner:npg_MAJDqzi0Nvt1@"
+    "ep-autumn-frog-adxfjews-pooler.c-2.us-east-1.aws.neon.tech/neondb"
+    "?sslmode=require&channel_binding=require"
+)
 
-#live
-URL_DATABASE = 'mysql+pymysql://sql12785307:AxFIQBvdf6@sql12.freesqldatabase.com:3306/sql12785307'
-
-engine = create_engine(URL_DATABASE)
-
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()

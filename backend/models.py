@@ -1,4 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, DECIMAL, Date, Boolean, ForeignKey, func
+from sqlalchemy import (
+    Column, Integer, String, Date, Boolean, DECIMAL,
+    ForeignKey, DateTime, func, Enum as ENUM  # ← this is important
+)
 from sqlalchemy.orm import relationship, validates
 from database import Base  # Ensure your `Base = declarative_base()` is defined in this module
 from datetime import datetime
@@ -25,7 +28,19 @@ class Area(BaseModel):
     area_id = Column(Integer, primary_key=True, index=True)
     area = Column(String(50), unique=True, nullable=False)
 
-class User(BaseModel):
+user_status_enum = ENUM(
+    'Active', 'Inactive', 'Shifted', 'Passed away',
+    name='user_status_enum',
+    create_type=True
+)
+
+user_type_enum = ENUM(
+    'NRS', 'All', 'Commitee', 'Siddhpur',
+    name='user_type_enum',
+    create_type=True
+)
+
+class User(Base):
     __tablename__ = "user"
 
     user_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -62,5 +77,8 @@ class User(BaseModel):
     receipt_date = Column(Date)
     receipt_amt = Column(DECIMAL(10, 2))
 
-    # created_at = Column(DateTime, default=datetime.utcnow)
-    # modified_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    status = Column(user_status_enum, default="Active", nullable=True)
+    type = Column(user_type_enum, default="All", nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

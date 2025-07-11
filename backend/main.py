@@ -163,19 +163,28 @@ def create_user(user: UserCreate, db: db_dependency):
         raise HTTPException(status_code=400, detail="Integrity error while creating user")
 
 from fastapi import Query
+from sqlalchemy import or_
 
 @app.get("/users/", status_code=status.HTTP_200_OK)
 def read_users(
     db: db_dependency,
     page_num: Optional[int] = 1,
-    name: Optional[str] = Query(None, description="Search by user name")
+    name: Optional[str] = Query(None, description="Search by user name, area, or village")
 ):
     offset = 10 * (page_num - 1)
 
     query = db.query(models.User).filter(models.User.delete_flag == False)
 
     if name:
-        query = query.filter(models.User.name.ilike(f"%{name}%"))
+        query = query.join(models.Area, isouter=True).join(models.Village, isouter=True)
+        search = f"%{name}%"
+        query = query.filter(
+            or_(
+                models.User.name.ilike(search),
+                models.Area.area.ilike(search),
+                models.Village.village.ilike(search)
+            )
+        )
 
     total_count = query.count()
     users = query.offset(offset).limit(10).all()
@@ -187,34 +196,34 @@ def read_users(
         "total_count": total_count,
         "page_num": page_num,
         "data": [
-                {
-                    "user_id": u.user_id,
-                    "usercode": u.usercode,
-                    "name": u.name,
-                    "surname": u.surname,
-                    "father_or_husband_name": u.father_or_husband_name,
-                    "mother_name": u.mother_name,
-                    "gender": u.gender,
-                    "birth_date": u.birth_date,
-                    "mobile_no1": u.mobile_no1,
-                    "mobile_no2": u.mobile_no2,
-                    "address": u.address,
-                    "pincode": u.pincode,
-                    "occupation": u.occupation,
-                    "country": u.country,
-                    "state": u.state,
-                    "email_id": u.email_id,
-                    "area": u.area.area if u.area else None,
-                    "village": u.village.village if u.village else None,
-                    "status": u.status,
-                    "type": u.type,
-                    
-                }
-                for u in users
-            ]
+            {
+                "user_id": u.user_id,
+                "usercode": u.usercode,
+                "name": u.name,
+                "surname": u.surname,
+                "father_or_husband_name": u.father_or_husband_name,
+                "mother_name": u.mother_name,
+                "gender": u.gender,
+                "birth_date": u.birth_date,
+                "mobile_no1": u.mobile_no1,
+                "mobile_no2": u.mobile_no2,
+                "address": u.address,
+                "pincode": u.pincode,
+                "occupation": u.occupation,
+                "country": u.country,
+                "state": u.state,
+                "email_id": u.email_id,
+                "area": u.area.area if u.area else None,
+                "village": u.village.village if u.village else None,
+                "status": u.status,
+                "type": u.type,
+            }
+            for u in users
+        ]
     }
 
     return response_body
+
 
 
 

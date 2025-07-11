@@ -43,6 +43,14 @@ Start the development server:
 npm run dev
 The frontend will be accessible at: http://localhost:3000
 
+to run and deploy the fresh frontend on git hub 
+# Clean and build
+>> npm run build
+>>
+>> # Deploy
+>> npm run deploy
+>>
+
 -------------------------------------------------------------------------------
 
 📌 Notes

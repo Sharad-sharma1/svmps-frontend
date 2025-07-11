@@ -190,7 +190,10 @@ def read_users(
                     "state": u.state,
                     "email_id": u.email_id,
                     "area": u.area.area if u.area else None,
-                    "village": u.village.village if u.village else None
+                    "village": u.village.village if u.village else None,
+                    "status": u.status,
+                    "type": u.type,
+                    
                 }
                 for u in users
             ]

@@ -52,16 +52,24 @@ async def create_village(village: VillageBase, db: db_dependency):
         )
 
 @app.get("/village/", status_code=status.HTTP_200_OK)
-async def read_village(db: db_dependency, village: Optional[str] = None, page_num: Optional[int] = 1):
+async def read_village(
+    db: db_dependency,
+    village: Optional[str] = None,
+    page_num: Optional[int] = 1
+):
     offset = 10 * (page_num - 1)
     query = db.query(models.Village)
-    if village is not None:
-        query = query.filter(models.Village.village == village)
-    village = query.offset(offset).limit(10).all()
-    response_body = {"total_count": len(query.all()), "page_num": page_num, "data": village}
-    if response_body is None:
-        raise HTTPException(status_code=404, detail="Village not found")
-    return response_body
+    if village:
+        query = query.filter(models.Village.village.ilike(f"%{village}%"))
+    total_count = query.count()
+    result = query.offset(offset).limit(10).all()
+
+    return {
+        "total_count": total_count,
+        "page_num": page_num,
+        "data": result
+    }
+
 
 # Route: Create Village
 @app.post("/area/", status_code=status.HTTP_201_CREATED)
@@ -81,16 +89,23 @@ async def create_area(area: AreaBase, db: db_dependency):
     
 
 @app.get("/area/", status_code=status.HTTP_200_OK)
-async def read_area(db: db_dependency, area: Optional[str] = None, page_num: Optional[int] = 1):
+async def read_area(
+    db: db_dependency,
+    area: Optional[str] = None,
+    page_num: Optional[int] = 1
+):
     offset = 10 * (page_num - 1)
     query = db.query(models.Area)
-    if area is not None:
-        query = query.filter(models.Area.area == area)
-    area = query.offset(offset).limit(10).all()
-    response_body = {"total_count": len(query.all()), "page_num": page_num, "data": area}
-    if response_body is None:
-        raise HTTPException(status_code=404, detail="Area not found")
-    return response_body
+    if area:
+        query = query.filter(models.Area.area.ilike(f"%{area}%"))
+    total_count = query.count()
+    result = query.offset(offset).limit(10).all()
+
+    return {
+        "total_count": total_count,
+        "page_num": page_num,
+        "data": result
+    }
 
 @app.delete("/village/{village_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_village(village_id: int, db: db_dependency):

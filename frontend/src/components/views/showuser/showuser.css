@@ -9,6 +9,8 @@
   border-radius: 12px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1);
   font-family: 'Segoe UI', sans-serif;
+  position: relative; /* ensure stacking context */
+  z-index: 1;
 }
 
 .show-user-container h2 {
@@ -34,9 +36,61 @@
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
+/* Filters */
+.filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.type-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.type-buttons button {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: #f3f4f6;
+  color: #374151;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.type-buttons button:hover {
+  background-color: #e2e8f0;
+}
+
+.type-buttons button:nth-child(1).active-type {
+  background-color: #1e40af; /* ALL - Blue */
+  color: white;
+}
+
+.type-buttons button:nth-child(2).active-type {
+  background-color: #059669; /* NRS - Green */
+  color: white;
+}
+
+.type-buttons button:nth-child(3).active-type {
+  background-color: #c2410c; /* COMMITEE - Orange */
+  color: white;
+}
+
+.type-buttons button:nth-child(4).active-type {
+  background-color: #9333ea; /* SIDDHPUR - Purple */
+  color: white;
+}
+
+
 /* Table Wrapper */
 .table-wrapper {
   overflow-x: auto;
+  overflow-y: visible;
+  position: relative;
+  z-index: 1;
 }
 
 /* Table */
@@ -46,8 +100,8 @@
   margin-bottom: 1rem;
   background: white;
   border-radius: 8px;
-  overflow: hidden;
-  table-layout: auto; /* ensure column width is dynamic */
+  overflow: visible;
+  table-layout: auto;
 }
 
 .user-table th {
@@ -57,7 +111,7 @@
   padding: 0.75rem;
   text-align: left;
   font-size: 0.95rem;
-  white-space: nowrap; /* prevent wrapping */
+  white-space: nowrap;
 }
 
 .user-table td {
@@ -65,7 +119,9 @@
   border-bottom: 1px solid #e5e7eb;
   font-size: 0.95rem;
   vertical-align: top;
-  white-space: nowrap; /* prevent wrapping */
+  white-space: nowrap;
+  position: relative;
+  z-index: 0;
 }
 
 /* Input inside Table (Edit mode) */
@@ -76,6 +132,14 @@
   border: 1px solid #d1d5db;
   font-size: 0.85rem;
   background-color: #f9fafb;
+  z-index: 2;
+}
+
+/* Highlight edited row */
+.user-table tr.editing-row {
+  position: relative;
+  z-index: 10;
+  background-color: #fff;
 }
 
 /* Zebra Striping & Hover */
@@ -185,3 +249,56 @@
     font-size: 0.75rem;
   }
 }
+
+/* React Select Dropdown Fix */
+.react-select-container {
+  position: relative;
+  z-index: 10;
+}
+
+.react-select__menu {
+  z-index: 9999 !important;
+  background: white !important;
+  position: absolute !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  border: 1px solid #ccc;
+  color: #000;
+}
+
+.react-select__menu-list {
+  z-index: 9999;
+  background-color: white;
+}
+/* Fix select dropdown z-index inside table rows */
+tr {
+  overflow: visible !important;
+  position: relative;
+  z-index: 1;
+}
+
+.react-select-menu__menu {
+  z-index: 9999 !important;
+  position: absolute !important;
+}
+
+.react-select-menu__menu-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* Fix for react-select inside table */
+.select-wrapper {
+  position: relative;
+  z-index: 1000;
+}
+
+/* Portal styles for dropdown */
+.react-select-menu__menu {
+  z-index: 9999 !important;
+}
+
+.react-select-menu__menu-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+

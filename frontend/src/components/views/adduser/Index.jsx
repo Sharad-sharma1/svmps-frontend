@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import axios from "axios";
+import AsyncSelect from "react-select/async";
 import "./adduser.css";
 
 const Adduser = () => {
@@ -15,31 +16,24 @@ const Adduser = () => {
     mobile_no2: "",
     fk_area_id: "",
     fk_village_id: "",
+    area: "",
+    village: "",
     address: "",
     pincode: "",
     occupation: "",
     country: "",
     state: "",
     email_id: "",
+    status: "Active",
+    type: "All",
     receipt_flag: false,
     receipt_no: "",
     receipt_date: "",
     receipt_amt: "",
   });
 
-  const [areas, setAreas] = useState([]);
-  const [villages, setVillages] = useState([]);
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState({});
-
-  useEffect(() => {
-    axios.get("https://svmps-frontend.onrender.com/area/").then((res) => {
-      setAreas(res.data.data);
-    });
-    axios.get("https://svmps-frontend.onrender.com/village/").then((res) => {
-      setVillages(res.data.data);
-    });
-  }, []);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -54,17 +48,14 @@ const Adduser = () => {
     setErrors({});
     setMessage("");
 
-    // Convert empty strings to null
     const cleanedData = { ...formData };
     Object.keys(cleanedData).forEach((key) => {
-      if (cleanedData[key] === "") {
-        cleanedData[key] = null;
-      }
+      if (cleanedData[key] === "") cleanedData[key] = null;
     });
 
     try {
       await axios.post("https://svmps-frontend.onrender.com/users/", cleanedData);
-      setMessage("User created successfully!");
+      setMessage("✅ User created successfully!");
       setFormData({
         usercode: "",
         name: "",
@@ -77,12 +68,16 @@ const Adduser = () => {
         mobile_no2: "",
         fk_area_id: "",
         fk_village_id: "",
+        area: "",
+        village: "",
         address: "",
         pincode: "",
         occupation: "",
         country: "",
         state: "",
         email_id: "",
+        status: "Active",
+        type: "All",
         receipt_flag: false,
         receipt_no: "",
         receipt_date: "",
@@ -98,8 +93,38 @@ const Adduser = () => {
         setErrors(fieldErrors);
       } else {
         console.error(error);
-        setMessage("Error creating user");
+        setMessage("❌ Error creating user");
       }
+    }
+  };
+
+  const loadAreaOptions = async (inputValue) => {
+    try {
+      const res = await axios.get("https://svmps-frontend.onrender.com/area/", {
+        params: { area: inputValue }
+      });
+      return res.data.data.map((area) => ({
+        label: area.area,
+        value: area.area_id,
+      }));
+    } catch (err) {
+      console.error("Area fetch failed", err);
+      return [];
+    }
+  };
+
+  const loadVillageOptions = async (inputValue) => {
+    try {
+      const res = await axios.get("https://svmps-frontend.onrender.com/village/", {
+        params: { village: inputValue }
+      });
+      return res.data.data.map((village) => ({
+        label: village.village,
+        value: village.village_id,
+      }));
+    } catch (err) {
+      console.error("Village fetch failed", err);
+      return [];
     }
   };
 
@@ -107,44 +132,56 @@ const Adduser = () => {
     <div className="form-container">
       <h2>Create User</h2>
       <form onSubmit={handleSubmit}>
-        <input
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          placeholder="Name"
-          className={errors.name ? "input-error" : ""}
-          required
-        />
-        {errors.name && <span className="error-text">{errors.name}</span>}
-
+        <input name="name" value={formData.name} onChange={handleChange} placeholder="Name" required />
         <input name="surname" value={formData.surname} onChange={handleChange} placeholder="Surname" />
-
         <input name="father_or_husband_name" value={formData.father_or_husband_name} onChange={handleChange} placeholder="Father/Husband Name" />
-
         <input name="mother_name" value={formData.mother_name} onChange={handleChange} placeholder="Mother Name" />
-
         <input name="gender" value={formData.gender} onChange={handleChange} placeholder="Gender" />
-
-        <input name="birth_date" type="date" value={formData.birth_date} onChange={handleChange} className={errors.birth_date ? "input-error" : ""} />
-        {errors.birth_date && <span className="error-text">{errors.birth_date}</span>}
-
+        <input name="birth_date" type="date" value={formData.birth_date} onChange={handleChange} />
         <input name="mobile_no1" value={formData.mobile_no1} onChange={handleChange} placeholder="Mobile 1" />
-
         <input name="mobile_no2" value={formData.mobile_no2} onChange={handleChange} placeholder="Mobile 2" />
 
-        <select name="fk_area_id" value={formData.fk_area_id} onChange={handleChange}>
-          <option value="">Select Area</option>
-          {areas.map((a) => (
-            <option key={a.area_id} value={a.area_id}>{a.area}</option>
-          ))}
-        </select>
+        <AsyncSelect
+          cacheOptions
+          defaultOptions
+          loadOptions={loadAreaOptions}
+          placeholder="Select Area"
+          onChange={(selected) =>
+            setFormData((prev) => ({
+              ...prev,
+              fk_area_id: selected?.value || "",
+              area: selected?.label || "",
+            }))
+          }
+          value={
+            formData.fk_area_id
+              ? { value: formData.fk_area_id, label: formData.area }
+              : null
+          }
+          isClearable
+          styles={{ container: (base) => ({ ...base, width: 180 }) }}
+        />
 
-        <select name="fk_village_id" value={formData.fk_village_id} onChange={handleChange}>
-          <option value="">Select Village</option>
-          {villages.map((v) => (
-            <option key={v.village_id} value={v.village_id}>{v.village}</option>
-          ))}
-        </select>
+        <AsyncSelect
+          cacheOptions
+          defaultOptions
+          loadOptions={loadVillageOptions}
+          placeholder="Select Village"
+          onChange={(selected) =>
+            setFormData((prev) => ({
+              ...prev,
+              fk_village_id: selected?.value || "",
+              village: selected?.label || "",
+            }))
+          }
+          value={
+            formData.fk_village_id
+              ? { value: formData.fk_village_id, label: formData.village }
+              : null
+          }
+          isClearable
+          styles={{ container: (base) => ({ ...base, width: 180 }) }}
+        />
 
         <input name="address" value={formData.address} onChange={handleChange} placeholder="Address" />
         <input name="pincode" value={formData.pincode} onChange={handleChange} placeholder="Pincode" />
@@ -153,10 +190,29 @@ const Adduser = () => {
         <input name="state" value={formData.state} onChange={handleChange} placeholder="State" />
         <input name="email_id" value={formData.email_id} onChange={handleChange} placeholder="Email" />
 
+        <select name="status" value={formData.status} onChange={handleChange} style={{ width: "180px" }}>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+          <option value="Shifted">Shifted</option>
+          <option value="Passed away">Passed away</option>
+        </select>
+
+        <select name="type" value={formData.type} onChange={handleChange} style={{ width: "180px" }}>
+          <option value="NRS">NRS</option>
+          <option value="All">All</option>
+          <option value="Commitee">Commitee</option>
+          <option value="Siddhpur">Siddhpur</option>
+        </select>
+
         <div className="receipt-section">
-          <label className="receipt-label">
+          <label>
             Receipt Issued?
-            <input type="checkbox" name="receipt_flag" checked={formData.receipt_flag} onChange={handleChange} />
+            <input
+              type="checkbox"
+              name="receipt_flag"
+              checked={formData.receipt_flag}
+              onChange={handleChange}
+            />
           </label>
           <input name="receipt_no" value={formData.receipt_no} onChange={handleChange} placeholder="Receipt No" />
           <input name="receipt_date" type="date" value={formData.receipt_date} onChange={handleChange} />

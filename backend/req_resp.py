@@ -53,6 +53,14 @@ class UserUpdate(BaseModel):
     state: Optional[str] = None
     email_id: Optional[str] = None
 
+    fk_area_id: Optional[int] = None
+    fk_village_id: Optional[int] = None
+    status: Optional[str] = None  # should match enum values
+    type: Optional[str] = None    # should match enum values
+
+    class Config:
+        orm_mode = True
+
 
 
 

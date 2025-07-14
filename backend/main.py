@@ -162,17 +162,20 @@ def create_user(user: UserCreate, db: db_dependency):
         db.rollback()
         raise HTTPException(status_code=400, detail="Integrity error while creating user")
 
-from fastapi import Query
 from sqlalchemy import or_
+from typing import List, Optional
+from fastapi import Query
 
 @app.get("/users/", status_code=status.HTTP_200_OK)
 def read_users(
     db: db_dependency,
     page_num: Optional[int] = 1,
-    name: Optional[str] = Query(None, description="Search by user name, area, or village")
+    name: Optional[str] = Query(None, description="Search by user name, area, or village"),
+    type_filter: Optional[List[str]] = Query(None, description="Filter by user types (e.g., NRS, ALL, etc.)"),
+    area_ids: Optional[List[int]] = Query(None, description="Filter by multiple area IDs"),
+    village_ids: Optional[List[int]] = Query(None, description="Filter by multiple village IDs")
 ):
     offset = 10 * (page_num - 1)
-
     query = db.query(models.User).filter(models.User.delete_flag == False)
 
     if name:
@@ -186,8 +189,18 @@ def read_users(
             )
         )
 
+    if type_filter:
+        query = query.filter(models.User.type.in_([t.upper() for t in type_filter]))
+
+    if area_ids:
+        query = query.filter(models.User.fk_area_id.in_(area_ids))
+
+    if village_ids:
+        query = query.filter(models.User.fk_village_id.in_(village_ids))
+
     total_count = query.count()
-    users = query.offset(offset).limit(10).all()
+    users = query.order_by(models.User.created_at.desc()).offset(offset).limit(10).all()
+
 
     if not users:
         raise HTTPException(status_code=404, detail="Users not found")
@@ -227,23 +240,34 @@ def read_users(
 
 
 
+
+from fastapi import APIRouter, HTTPException, status, Depends
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 @app.put("/users/{user_id}", response_model=UserUpdate)
 def update_user(user_id: int, updated_user: UserUpdate, db: db_dependency):
-    print("Received update payload:", updated_user.dict(exclude_unset=True)) 
-    user = db.query(models.User).filter(models.User.user_id == user_id, models.User.delete_flag == False).first()
+    print("Received update payload:", updated_user.dict(exclude_unset=True))
+
+    user = db.query(models.User).filter(
+        models.User.user_id == user_id,
+        models.User.delete_flag == False
+    ).first()
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    for key, value in updated_user.dict(exclude_unset=True).items():
-        setattr(user, key, value)
-
     try:
+        for key, value in updated_user.dict(exclude_unset=True).items():
+            setattr(user, key, value)
+
         db.commit()
         db.refresh(user)
-        return user
+        return updated_user
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=400, detail="Integrity error while updating user")
+
 
 
 @app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -35,7 +35,7 @@ user_status_enum = ENUM(
 )
 
 user_type_enum = ENUM(
-    'NRS', 'All', 'Commitee', 'Siddhpur',
+    'NRS', 'ALL', 'COMMITEE', 'SIDDHPUR',
     name='user_type_enum',
     create_type=True
 )

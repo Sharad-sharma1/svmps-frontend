@@ -212,7 +212,7 @@ def read_users(
             group_block = []
 
             # Fake header inside content flow (looks like a canvas header)
-            header_para = Paragraph(f"<b>User Report Grouped by Type: {user_type}</b>", ParagraphStyle(
+            header_para = Paragraph(f"<b>Type: {user_type}</b>", ParagraphStyle(
                 name='HeaderStyle',
                 fontName='Helvetica-Bold',
                 fontSize=12,
@@ -227,11 +227,11 @@ def read_users(
             for u in group_users:
                 name = f"{u.name} {u.father_or_husband_name or ''} {u.surname or ''}"
                 para_text = f"""
-                    To: {u.area.area if u.area else ''}<br/>
-                    <b>Name:</b> {name}<br/>
-                    Address: {u.address or ''}<br/>
-                    Mobile: {u.mobile_no1 or ''} / {u.mobile_no2 or ''}<br/>
-                    Village: {u.village.village if u.village else ''}
+                    TO: {u.area.area if u.area else ''}<br/>
+                    <b>NAME:</b> {name}<br/>
+                    <b>ADDRESS:</b> {u.address or ''}<br/>
+                    <b>MOBILE:</b> {u.mobile_no1 or ''} / {u.mobile_no2 or ''}<br/>
+                    <b>VILLAGE:</b> {u.village.village if u.village else ''}
                 """
                 para = Paragraph(para_text, red_bold)
                 if len(current_row) == 2:

@@ -25,7 +25,7 @@ const Showuser = () => {
         village_ids: selectedVillages.map((v) => v.value),
       };
 
-      const response = await axios.get("https://svmps-frontend.onrender.com/users/", {
+      const response = await axios.get("http://127.0.0.1:8001/users/", {
         params,
         paramsSerializer: (params) =>
           qs.stringify(params, { arrayFormat: "repeat" }),
@@ -54,7 +54,7 @@ const Showuser = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`https://svmps-frontend.onrender.com/users/${id}`);
+      await axios.delete(`http://127.0.0.1:8001/users/${id}`);
       alert("✅ User deleted successfully.");
       fetchUsers(page, searchTerm);
     } catch (err) {
@@ -75,7 +75,7 @@ const Showuser = () => {
 
   const handleEditSubmit = async () => {
     try {
-      await axios.put(`https://svmps-frontend.onrender.com/users/${editUser}`, editForm);
+      await axios.put(`http://127.0.0.1:8001/users/${editUser}`, editForm);
       alert("✅ User updated successfully.");
       setEditUser(null);
       fetchUsers(page, searchTerm);
@@ -87,7 +87,7 @@ const Showuser = () => {
 
   const loadAreaOptions = async (inputValue) => {
     try {
-      const res = await axios.get("https://svmps-frontend.onrender.com/area/", {
+      const res = await axios.get("http://127.0.0.1:8001/area/", {
         params: { area: inputValue },
       });
       return res.data.data.map((area) => ({
@@ -102,7 +102,7 @@ const Showuser = () => {
 
   const loadVillageOptions = async (inputValue) => {
     try {
-      const res = await axios.get("https://svmps-frontend.onrender.com/village/", {
+      const res = await axios.get("http://127.0.0.1:8001/village/", {
         params: { village: inputValue },
       });
       return res.data.data.map((village) => ({
@@ -116,6 +116,41 @@ const Showuser = () => {
   };
 
   const totalPages = Math.ceil(totalCount / 10);
+
+  const handleDownloadPDF = async () => {
+  try {
+    const params = {
+      pdf: true,
+      name: searchTerm,
+      page_num: page,
+      type_filter: typeFilters,
+      area_ids: selectedAreas.map((a) => a.value),
+      village_ids: selectedVillages.map((v) => v.value),
+    };
+
+    const response = await axios.get("http://127.0.0.1:8001/users/", {
+      params,
+      responseType: "blob",
+      paramsSerializer: (params) =>
+        qs.stringify(params, { arrayFormat: "repeat" }),
+    });
+
+    const blob = new Blob([response.data], { type: "application/pdf" });
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `users_${Date.now()}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("❌ Failed to download PDF:", err);
+    alert("❌ Failed to download PDF.");
+  }
+};
+
 
   return (
     <div className="show-user-container">
@@ -176,10 +211,11 @@ const Showuser = () => {
       menuPortalTarget={document.body}
     />
   </div>
+  <div className="download-pdf-wrapper">
+    <button className="download-pdf-btn" onClick={handleDownloadPDF}>
+      Download PDF
+    </button>
 </div>
-
-
-      <div className="table-wrapper">
         <table className="user-table">
           <thead>
             <tr>

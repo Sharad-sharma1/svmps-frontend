@@ -40,7 +40,7 @@ const Navbar = () => {
         <Link to="/village" className="sidebar-link" onClick={closeSidebar}>Village</Link>
         <Link to="/user" className="sidebar-link" onClick={closeSidebar}>User</Link>
         <Link to="/showuser" className="sidebar-link" onClick={closeSidebar}>Show User</Link>
-        <Link to="/printuser" className="sidebar-link" onClick={closeSidebar}>Print User</Link>
+        <Link to="/printuser" className="sidebar-link" onClick={closeSidebar}>Receipt</Link>
         <Link to="/" className="login-button">Log Out</Link>
       </div>
       

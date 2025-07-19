@@ -23,9 +23,8 @@ const Home = () => {
           <p className="card-desc">You can view and filter users.</p>
         </Link>
         <Link to="/printuser" className="card">
-          <h3 className="card-title">Print User</h3>
-          <p className="card-desc">You can download user details with 
-            Multiple options.</p>
+          <h3 className="card-title">Receipt</h3>
+          <p className="card-desc">Coming soon...</p>
         </Link>
         {/* You can add up to 4 more cards here later */}
       </div>

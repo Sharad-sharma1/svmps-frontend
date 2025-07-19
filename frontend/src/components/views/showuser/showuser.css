@@ -302,7 +302,7 @@ tr {
   overflow-y: auto;
 }
 
-.download-pdf-btn {
+.download-btn {
   background-color: red;
   color: white;
   padding: 8px 16px;
@@ -313,10 +313,6 @@ tr {
   transition: background-color 0.2s ease;
 }
 
-.download-pdf-btn:hover {
+.download-btn:hover {
   background-color: darkred;
-}
-
-.download-pdf-wrapper {
-  margin-top: 10px;
 }

@@ -2,7 +2,7 @@ import React from 'react'
 
 const Printuser = () => {
   return (
-    <div>Printuser</div>
+    <div>Receipt</div>
   )
 }
 

@@ -25,7 +25,7 @@ const Showuser = () => {
         village_ids: selectedVillages.map((v) => v.value),
       };
 
-      const response = await axios.get("http://127.0.0.1:8001/users/", {
+      const response = await axios.get("https://svmps-frontend.onrender.com/users/", {
         params,
         paramsSerializer: (params) =>
           qs.stringify(params, { arrayFormat: "repeat" }),
@@ -54,7 +54,7 @@ const Showuser = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://127.0.0.1:8001/users/${id}`);
+      await axios.delete(`https://svmps-frontend.onrender.com/users/${id}`);
       alert("✅ User deleted successfully.");
       fetchUsers(page, searchTerm);
     } catch (err) {
@@ -75,7 +75,7 @@ const Showuser = () => {
 
   const handleEditSubmit = async () => {
     try {
-      await axios.put(`http://127.0.0.1:8001/users/${editUser}`, editForm);
+      await axios.put(`https://svmps-frontend.onrender.com/users/${editUser}`, editForm);
       alert("✅ User updated successfully.");
       setEditUser(null);
       fetchUsers(page, searchTerm);
@@ -85,9 +85,39 @@ const Showuser = () => {
     }
   };
 
+  const handleDownloadPDF = async () => {
+  try {
+    const params = {
+      name: searchTerm,
+      type_filter: typeFilters,
+      area_ids: selectedAreas.map((a) => a.value),
+      village_ids: selectedVillages.map((v) => v.value),
+      pdf: true,
+    };
+
+    const response = await axios.get("https://svmps-frontend.onrender.com/users/", {
+      params,
+      paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
+      responseType: 'blob',
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'users_report.pdf');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (error) {
+    console.error("❌ Failed to download PDF:", error);
+    alert("❌ Error downloading PDF.");
+  }
+};
+
+
   const loadAreaOptions = async (inputValue) => {
     try {
-      const res = await axios.get("http://127.0.0.1:8001/area/", {
+      const res = await axios.get("https://svmps-frontend.onrender.com/area/", {
         params: { area: inputValue },
       });
       return res.data.data.map((area) => ({
@@ -102,7 +132,7 @@ const Showuser = () => {
 
   const loadVillageOptions = async (inputValue) => {
     try {
-      const res = await axios.get("http://127.0.0.1:8001/village/", {
+      const res = await axios.get("https://svmps-frontend.onrender.com/village/", {
         params: { village: inputValue },
       });
       return res.data.data.map((village) => ({
@@ -117,45 +147,9 @@ const Showuser = () => {
 
   const totalPages = Math.ceil(totalCount / 10);
 
-  const handleDownloadPDF = async () => {
-  try {
-    const params = {
-      pdf: true,
-      name: searchTerm,
-      page_num: page,
-      type_filter: typeFilters,
-      area_ids: selectedAreas.map((a) => a.value),
-      village_ids: selectedVillages.map((v) => v.value),
-    };
-
-    const response = await axios.get("http://127.0.0.1:8001/users/", {
-      params,
-      responseType: "blob",
-      paramsSerializer: (params) =>
-        qs.stringify(params, { arrayFormat: "repeat" }),
-    });
-
-    const blob = new Blob([response.data], { type: "application/pdf" });
-    const url = window.URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `users_${Date.now()}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error("❌ Failed to download PDF:", err);
-    alert("❌ Failed to download PDF.");
-  }
-};
-
-
   return (
     <div className="show-user-container">
       <h2>User List</h2>
-
       <div className="filters">
   <input
     type="text"
@@ -211,24 +205,25 @@ const Showuser = () => {
       menuPortalTarget={document.body}
     />
   </div>
-  <div className="download-pdf-wrapper">
-    <button className="download-pdf-btn" onClick={handleDownloadPDF}>
-      Download PDF
-    </button>
+  <button className="download-btn" onClick={handleDownloadPDF}>Download PDF</button>
+
 </div>
+
+
+      <div className="table-wrapper">
         <table className="user-table">
           <thead>
             <tr>
               <th>Actions</th>
               <th>ID</th>
               <th>Name</th>
+              <th>Father/Husband</th>
+              <th>Surname</th>
               <th>Village</th>
               <th>Area</th>
               <th>Status</th>
               <th>Type</th>
               <th>Address</th>
-              <th>Surname</th>
-              <th>Father/Husband</th>
               <th>Pincode</th>
               <th>State</th>
               <th>User Code</th>
@@ -261,7 +256,8 @@ const Showuser = () => {
                   </td>
                   <td>{user.user_id}</td>
                   <td>{editUser === user.user_id ? <input name="name" value={editForm.name || ""} onChange={handleEditChange} /> : user.name || "-"}</td>
-
+                  <td>{editUser === user.user_id ? <input name="father_or_husband_name" value={editForm.father_or_husband_name || ""} onChange={handleEditChange} /> : user.father_or_husband_name || "-"}</td>
+                  <td>{editUser === user.user_id ? <input name="surname" value={editForm.surname || ""} onChange={handleEditChange} /> : user.surname || "-"}</td>
                   {/* 🟢 Village Select */}
                   <td>
                     {editUser === user.user_id ? (
@@ -344,8 +340,6 @@ const Showuser = () => {
                     <option value="SIDDHPUR">SIDDHPUR</option>
                   </select> : user.type || "-"}</td>
                   <td>{editUser === user.user_id ? <input name="address" value={editForm.address || ""} onChange={handleEditChange} /> : user.address || "-"}</td>
-                  <td>{editUser === user.user_id ? <input name="surname" value={editForm.surname || ""} onChange={handleEditChange} /> : user.surname || "-"}</td>
-                  <td>{editUser === user.user_id ? <input name="father_or_husband_name" value={editForm.father_or_husband_name || ""} onChange={handleEditChange} /> : user.father_or_husband_name || "-"}</td>
                   <td>{editUser === user.user_id ? <input name="pincode" value={editForm.pincode || ""} onChange={handleEditChange} /> : user.pincode || "-"}</td>
                   <td>{editUser === user.user_id ? <input name="state" value={editForm.state || ""} onChange={handleEditChange} /> : user.state || "-"}</td>
                   <td>{editUser === user.user_id ? <input name="usercode" value={editForm.usercode || ""} onChange={handleEditChange} /> : user.usercode || "-"}</td>

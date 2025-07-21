@@ -155,13 +155,7 @@ def read_users(
 
     if name:
         search = f"%{name}%"
-        query = query.join(models.Area, isouter=True).join(models.Village, isouter=True).filter(
-            or_(
-                models.User.name.ilike(search),
-                models.Area.area.ilike(search),
-                models.Village.village.ilike(search)
-            )
-        )
+        query = query.filter(models.User.name.ilike(search))
 
     if type_filter:
         query = query.filter(models.User.type.in_([t.upper() for t in type_filter]))
@@ -174,8 +168,7 @@ def read_users(
 
     if pdf:
         users = (
-            db.query(models.User)
-            .join(models.User.village)
+            query
             .options(joinedload(models.User.area), joinedload(models.User.village))
             .filter(models.User.delete_flag == False)
             .order_by(models.User.type, models.Village.village)

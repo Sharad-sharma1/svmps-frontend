@@ -62,14 +62,39 @@ async def read_village(
     village: Optional[str] = None,
     page_num: Optional[int] = 1
 ):
+    from sqlalchemy import func
+    
     offset = 10 * (page_num - 1)
-    query = db.query(models.Village)
+    
+    # Query with user count
+    query = db.query(
+        models.Village.village_id,
+        models.Village.village,
+        func.count(models.User.user_id).label("user_count")
+    ).outerjoin(
+        models.User,
+        (models.Village.village_id == models.User.fk_village_id) &
+        ((models.User.delete_flag == False) | (models.User.delete_flag == None))
+    ).group_by(
+        models.Village.village_id,
+        models.Village.village
+    )
+    
     if village:
         query = query.filter(models.Village.village.ilike(f"%{village}%"))
-    total_count = query.count()
+    
+    total_count = db.query(models.Village).count()
     result = query.offset(offset).limit(10).all()
-    return {"total_count": total_count, "page_num": page_num, "data": result}
-
+    
+    return {
+        "total_count": total_count,
+        "page_num": page_num,
+        "data": [{
+            "village_id": r.village_id,
+            "village": r.village,
+            "user_count": r.user_count
+        } for r in result]
+    }
 @app.delete("/village/{village_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_village(village_id: int, db: db_dependency):
     db_village = db.query(models.Village).filter(models.Village.village_id == village_id).first()
@@ -97,13 +122,39 @@ async def read_area(
     area: Optional[str] = None,
     page_num: Optional[int] = 1
 ):
+    from sqlalchemy import func
+    
     offset = 10 * (page_num - 1)
-    query = db.query(models.Area)
+    
+    # Query with user count
+    query = db.query(
+        models.Area.area_id,
+        models.Area.area,
+        func.count(models.User.user_id).label("user_count")
+    ).outerjoin(
+        models.User, 
+        (models.Area.area_id == models.User.fk_area_id) & 
+        ((models.User.delete_flag == False) | (models.User.delete_flag == None))
+    ).group_by(
+        models.Area.area_id,
+        models.Area.area
+    )
+    
     if area:
         query = query.filter(models.Area.area.ilike(f"%{area}%"))
-    total_count = query.count()
+    
+    total_count = db.query(models.Area).count()
     result = query.offset(offset).limit(10).all()
-    return {"total_count": total_count, "page_num": page_num, "data": result}
+    
+    return {
+        "total_count": total_count, 
+        "page_num": page_num, 
+        "data": [{
+            "area_id": r.area_id,
+            "area": r.area,
+            "user_count": r.user_count
+        } for r in result]
+    }
 
 @app.delete("/area/{area_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_area(area_id: int, db: db_dependency):

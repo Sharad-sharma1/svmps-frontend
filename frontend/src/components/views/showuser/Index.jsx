@@ -25,7 +25,7 @@ const Showuser = () => {
         village_ids: selectedVillages.map((v) => v.value),
       };
 
-      const response = await axios.get("http://127.0.0.1:8001/users/", {
+      const response = await axios.get("https://svmps-frontend.onrender.com/users/", {
         params,
         paramsSerializer: (params) =>
           qs.stringify(params, { arrayFormat: "repeat" }),
@@ -54,7 +54,7 @@ const Showuser = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://127.0.0.1:8001/users/${id}`);
+      await axios.delete(`https://svmps-frontend.onrender.com/users/${id}`);
       alert("✅ User deleted successfully.");
       fetchUsers(page, searchTerm);
     } catch (err) {
@@ -75,7 +75,7 @@ const Showuser = () => {
 
   const handleEditSubmit = async () => {
     try {
-      await axios.put(`http://127.0.0.1:8001/users/${editUser}`, editForm);
+      await axios.put(`https://svmps-frontend.onrender.com/users/${editUser}`, editForm);
       alert("✅ User updated successfully.");
       setEditUser(null);
       fetchUsers(page, searchTerm);
@@ -95,7 +95,7 @@ const Showuser = () => {
       pdf: true,
     };
 
-    const response = await axios.get("http://127.0.0.1:8001/users/", {
+    const response = await axios.get("https://svmps-frontend.onrender.com/users/", {
       params,
       paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
       responseType: 'blob',
@@ -117,7 +117,7 @@ const Showuser = () => {
 
   const loadAreaOptions = async (inputValue) => {
     try {
-      const res = await axios.get("http://127.0.0.1:8001/area/", {
+      const res = await axios.get("https://svmps-frontend.onrender.com/area/", {
         params: { area: inputValue },
       });
       return res.data.data.map((area) => ({
@@ -132,7 +132,7 @@ const Showuser = () => {
 
   const loadVillageOptions = async (inputValue) => {
     try {
-      const res = await axios.get("http://127.0.0.1:8001/village/", {
+      const res = await axios.get("https://svmps-frontend.onrender.com/village/", {
         params: { village: inputValue },
       });
       return res.data.data.map((village) => ({

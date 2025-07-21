@@ -85,7 +85,7 @@ const Addarea = () => {
           {areas.length > 0 ? (
             areas.map((area) => (
               <li key={area.area_id} className="area-item">
-                {area.area}
+                {area.area} - {area.user_count}
                 <button
                   className="delete-button"
                   onClick={() => handleDeleteArea(area.area_id)}

@@ -85,7 +85,7 @@ const Addvillage = () => {
           {villages.length > 0 ? (
             villages.map((village) => (
               <li key={village.village_id} className="area-item">
-                {village.village}
+                {village.village} - {village.user_count}
                 <button
                   className="delete-button"
                   onClick={() => handleDeleteVillage(village.village_id)}

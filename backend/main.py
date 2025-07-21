@@ -219,12 +219,14 @@ def read_users(
 
     if pdf:
         users = (
-            query
-            .options(joinedload(models.User.area), joinedload(models.User.village))
-            .filter(models.User.delete_flag == False)
-            .order_by(models.User.type, models.Village.village)
-            .all()
-        )
+                query
+                .join(models.Village, models.User.fk_village_id == models.Village.village_id)
+                .options(joinedload(models.User.area), joinedload(models.User.village))
+                .filter(models.User.delete_flag == False)
+                .order_by(models.User.type, models.Village.village)
+                .all()
+            )
+
 
         buffer = BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, title="User Report")

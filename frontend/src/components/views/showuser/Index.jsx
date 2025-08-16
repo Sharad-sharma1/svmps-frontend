@@ -154,7 +154,7 @@ const Showuser = () => {
       <div className="filters">
   <input
     type="text"
-    placeholder="Search by name, area, or village..."
+    placeholder="Search by name"
     value={searchTerm}
     onChange={handleSearchChange}
   />

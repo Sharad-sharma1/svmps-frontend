@@ -84,6 +84,11 @@
   color: white;
 }
 
+.type-buttons button:nth-child(5).active-type {
+  background-color: #d7e421; /* SEVASADAN - Yellow */
+  color: white;
+}
+
 
 /* Table Wrapper */
 .table-wrapper {

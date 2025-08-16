@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import qs from "qs";
 import AsyncSelect from "react-select/async";
+import { API_URLS } from "../../../utils/fetchurl";
 import "./Showuser.css";
 
 const Showuser = () => {
@@ -25,7 +26,7 @@ const Showuser = () => {
         village_ids: selectedVillages.map((v) => v.value),
       };
 
-      const response = await axios.get("https://svmps-frontend.onrender.com/users/", {
+      const response = await axios.get(API_URLS.getAllUsers(), {
         params,
         paramsSerializer: (params) =>
           qs.stringify(params, { arrayFormat: "repeat" }),
@@ -54,7 +55,7 @@ const Showuser = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`https://svmps-frontend.onrender.com/users/${id}`);
+      await axios.delete(API_URLS.deleteUser(id));
       alert("✅ User deleted successfully.");
       fetchUsers(page, searchTerm);
     } catch (err) {
@@ -75,7 +76,7 @@ const Showuser = () => {
 
   const handleEditSubmit = async () => {
     try {
-      await axios.put(`https://svmps-frontend.onrender.com/users/${editUser}`, editForm);
+      await axios.put(API_URLS.updateUser(editUser), editForm);
       alert("✅ User updated successfully.");
       setEditUser(null);
       fetchUsers(page, searchTerm);
@@ -95,7 +96,7 @@ const Showuser = () => {
       pdf: true,
     };
 
-    const response = await axios.get("https://svmps-frontend.onrender.com/users/", {
+    const response = await axios.get(API_URLS.getAllUsers(), {
       params,
       paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
       responseType: 'blob',
@@ -117,7 +118,7 @@ const Showuser = () => {
 
   const loadAreaOptions = async (inputValue) => {
     try {
-      const res = await axios.get("https://svmps-frontend.onrender.com/area/", {
+      const res = await axios.get(API_URLS.getAllAreas(), {
         params: { area: inputValue },
       });
       return res.data.data.map((area) => ({
@@ -132,7 +133,7 @@ const Showuser = () => {
 
   const loadVillageOptions = async (inputValue) => {
     try {
-      const res = await axios.get("https://svmps-frontend.onrender.com/village/", {
+      const res = await axios.get(API_URLS.getAllVillages(), {
         params: { village: inputValue },
       });
       return res.data.data.map((village) => ({
@@ -159,7 +160,7 @@ const Showuser = () => {
   />
 
   <div className="type-buttons">
-    {["ALL", "NRS", "COMMITEE", "SIDDHPUR"].map((type) => (
+    {["ALL", "NRS", "COMMITEE", "SIDDHPUR","SEVASADAN"].map((type) => (
       <button
         key={type}
         onClick={() =>
@@ -338,6 +339,7 @@ const Showuser = () => {
                     <option value="ALL">ALL</option>
                     <option value="COMMITEE">COMMITEE</option>
                     <option value="SIDDHPUR">SIDDHPUR</option>
+                    <option value="SEVASADAN">SEVASADAN</option>
                   </select> : user.type || "-"}</td>
                   <td>{editUser === user.user_id ? <input name="address" value={editForm.address || ""} onChange={handleEditChange} /> : user.address || "-"}</td>
                   <td>{editUser === user.user_id ? <input name="pincode" value={editForm.pincode || ""} onChange={handleEditChange} /> : user.pincode || "-"}</td>

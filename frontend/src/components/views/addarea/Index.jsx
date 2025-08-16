@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { API_URLS } from "../../../utils/fetchurl";
 import "./Area.css";
 
 const Addarea = () => {
@@ -12,7 +13,7 @@ const Addarea = () => {
 
   const fetchAreas = async (page = 1, searchValue = "") => {
     try {
-      const response = await axios.get("https://svmps-frontend.onrender.com/area/", {
+      const response = await axios.get(API_URLS.getAllAreas(), {
         params: {
           page_num: page,
           area: searchValue || undefined,
@@ -32,7 +33,7 @@ const Addarea = () => {
   const handleAddArea = async () => {
     if (newArea.trim()) {
       try {
-        await axios.post("https://svmps-frontend.onrender.com/area/", {
+        await axios.post(API_URLS.createArea(), {
           area: newArea.trim(),
         });
         setNewArea("");
@@ -45,7 +46,7 @@ const Addarea = () => {
 
   const handleDeleteArea = async (id) => {
     try {
-      await axios.delete(`https://svmps-frontend.onrender.com/area/${id}`);
+      await axios.delete(API_URLS.deleteArea(id));
       fetchAreas(currentPage, search);
     } catch (error) {
       alert("Error deleting area.");

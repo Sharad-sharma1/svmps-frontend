@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { API_URLS } from "../../../utils/fetchurl";
 import "../addarea/Area.css";
 
 const Addvillage = () => {
@@ -12,7 +13,7 @@ const Addvillage = () => {
 
   const fetchVillages = async (page = 1, searchValue = "") => {
     try {
-      const response = await axios.get("https://svmps-frontend.onrender.com/village/", {
+      const response = await axios.get(API_URLS.getAllVillages(), {
         params: {
           page_num: page,
           village: searchValue || undefined,
@@ -32,7 +33,7 @@ const Addvillage = () => {
   const handleAddVillage = async () => {
     if (newVillage.trim()) {
       try {
-        await axios.post("https://svmps-frontend.onrender.com/village/", {
+        await axios.post(API_URLS.createVillage(), {
           village: newVillage.trim(),
         });
         setNewVillage("");
@@ -45,7 +46,7 @@ const Addvillage = () => {
 
   const handleDeleteVillage = async (id) => {
     try {
-      await axios.delete(`https://svmps-frontend.onrender.com/village/${id}`);
+      await axios.delete(API_URLS.deleteVillage(id));
       fetchVillages(currentPage, search);
     } catch (error) {
       alert("Error deleting village.");

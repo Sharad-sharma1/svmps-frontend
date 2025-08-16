@@ -59,7 +59,8 @@ class UserUpdate(BaseModel):
     type: Optional[str] = None    # should match enum values
 
     class Config:
-        orm_mode = True
+        # orm_mode = True
+        from_attributes = True
 
 
 

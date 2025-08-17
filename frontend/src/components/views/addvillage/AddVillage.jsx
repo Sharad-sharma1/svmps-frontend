@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { API_URLS } from "../../../utils/fetchurl";
+import Pagination from "../../common/Pagination";
 import "../addarea/Area.css";
 
-const Addvillage = () => {
+const AddVillage = () => {
   const [villages, setVillages] = useState([]);
   const [search, setSearch] = useState("");
   const [newVillage, setNewVillage] = useState("");
@@ -12,7 +14,7 @@ const Addvillage = () => {
 
   const fetchVillages = async (page = 1, searchValue = "") => {
     try {
-      const response = await axios.get("https://svmps-frontend.onrender.com/village/", {
+      const response = await axios.get(API_URLS.getAllVillages(), {
         params: {
           page_num: page,
           village: searchValue || undefined,
@@ -32,7 +34,7 @@ const Addvillage = () => {
   const handleAddVillage = async () => {
     if (newVillage.trim()) {
       try {
-        await axios.post("https://svmps-frontend.onrender.com/village/", {
+        await axios.post(API_URLS.createVillage(), {
           village: newVillage.trim(),
         });
         setNewVillage("");
@@ -45,7 +47,7 @@ const Addvillage = () => {
 
   const handleDeleteVillage = async (id) => {
     try {
-      await axios.delete(`https://svmps-frontend.onrender.com/village/${id}`);
+      await axios.delete(API_URLS.deleteVillage(id));
       fetchVillages(currentPage, search);
     } catch (error) {
       alert("Error deleting village.");
@@ -90,7 +92,7 @@ const Addvillage = () => {
                   className="delete-button"
                   onClick={() => handleDeleteVillage(village.village_id)}
                 >
-                  ❌
+                  ×
                 </button>
               </li>
             ))
@@ -100,22 +102,14 @@ const Addvillage = () => {
         </ul>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="pagination">
-            {Array.from({ length: totalPages }, (_, i) => (
-              <button
-                key={i + 1}
-                onClick={() => setCurrentPage(i + 1)}
-                className={currentPage === i + 1 ? "active" : ""}
-              >
-                {i + 1}
-              </button>
-            ))}
-          </div>
-        )}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
 };
 
-export default Addvillage;
+export default AddVillage;

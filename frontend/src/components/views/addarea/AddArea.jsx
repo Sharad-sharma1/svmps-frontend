@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { API_URLS } from "../../../utils/fetchurl";
+import Pagination from "../../common/Pagination";
 import "./Area.css";
 
-const Addarea = () => {
+const AddArea = () => {
   const [areas, setAreas] = useState([]);
   const [search, setSearch] = useState("");
   const [newArea, setNewArea] = useState("");
@@ -91,7 +92,7 @@ const Addarea = () => {
                   className="delete-button"
                   onClick={() => handleDeleteArea(area.area_id)}
                 >
-                  ❌
+                  ×
                 </button>
               </li>
             ))
@@ -101,22 +102,14 @@ const Addarea = () => {
         </ul>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="pagination">
-            {Array.from({ length: totalPages }, (_, i) => (
-              <button
-                key={i + 1}
-                onClick={() => setCurrentPage(i + 1)}
-                className={currentPage === i + 1 ? "active" : ""}
-              >
-                {i + 1}
-              </button>
-            ))}
-          </div>
-        )}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
 };
 
-export default Addarea;
+export default AddArea;

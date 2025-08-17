@@ -22,11 +22,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://sharad-sharma1.github.io",
-        "http://localhost:5173",
-        "http://localhost:3000",
-    ],
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,7 +80,7 @@ async def read_village(
         query = query.filter(models.Village.village.ilike(f"%{village}%"))
     
     total_count = db.query(models.Village).count()
-    result = query.offset(offset).limit(10).all()
+    result = query.order_by(models.Village.village).offset(offset).limit(10).all()
     
     return {
         "total_count": total_count,
@@ -144,7 +140,7 @@ async def read_area(
         query = query.filter(models.Area.area.ilike(f"%{area}%"))
     
     total_count = db.query(models.Area).count()
-    result = query.offset(offset).limit(10).all()
+    result = query.order_by(models.Area.area).offset(offset).limit(10).all()
     
     return {
         "total_count": total_count, 
@@ -206,7 +202,14 @@ def read_users(
 
     if name:
         search = f"%{name}%"
-        query = query.filter(models.User.name.ilike(search))
+        query = query.filter(
+            or_(
+                models.User.name.ilike(search),
+                models.User.father_or_husband_name.ilike(search),
+                models.User.mobile_no1.ilike(search),
+                models.User.mobile_no2.ilike(search)
+            )
+        )
 
     if type_filter:
         query = query.filter(models.User.type.in_([t.upper() for t in type_filter]))
@@ -220,9 +223,11 @@ def read_users(
     if pdf:
         users = (
             query
+            .join(models.Village, models.User.fk_village_id == models.Village.village_id, isouter=True)
+            .join(models.Area, models.User.fk_area_id == models.Area.area_id, isouter=True)
             .options(joinedload(models.User.area), joinedload(models.User.village))
             .filter(models.User.delete_flag == False)
-            .order_by(models.User.type, models.Village.village)
+            .order_by(models.User.type, models.Village.village, models.User.name)
             .all()
         )
 
@@ -317,7 +322,7 @@ def read_users(
             "village": u.village.village if u.village else None,
             "type": u.type,
             "status": u.status,
-        } for u in query.order_by(models.User.created_at.desc()).offset((page_num - 1) * 10).limit(10).all()]
+        } for u in query.join(models.Village, models.User.fk_village_id == models.Village.village_id, isouter=True).join(models.Area, models.User.fk_area_id == models.Area.area_id, isouter=True).order_by(models.User.type, models.Village.village, models.User.name).offset((page_num - 1) * 10).limit(10).all()]
     }
 
 @app.put("/users/{user_id}", response_model=UserUpdate)
@@ -342,3 +347,26 @@ def delete_user(user_id: int, db: db_dependency):
         raise HTTPException(status_code=404, detail="User not found")
     user.delete_flag = True
     db.commit()
+
+@app.get("/users/stats", status_code=status.HTTP_200_OK)
+def get_user_stats(db: db_dependency):
+    from sqlalchemy import func
+    
+    # Get total count
+    total_count = db.query(models.User).filter(models.User.delete_flag == False).count()
+    
+    # Get counts by type
+    type_counts = db.query(
+        models.User.type,
+        func.count(models.User.user_id).label("count")
+    ).filter(
+        models.User.delete_flag == False
+    ).group_by(models.User.type).all()
+    
+    # Convert to dictionary
+    stats = {"total": total_count}
+    for type_name, count in type_counts:
+        if type_name:  # Only include non-null types
+            stats[type_name.lower()] = count
+    
+    return stats

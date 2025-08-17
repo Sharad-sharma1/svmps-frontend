@@ -1,105 +1,64 @@
-// Central URL management for API endpoints
-// This file manages all API URLs for both development and production environments
+// 100% .env dependent API URL management - NO FALLBACKS!
 
-/**
- * Get the current environment from Vite environment variables
- * Defaults to 'development' if not specified
- */
-const getEnvironment = () => {
-  return import.meta.env.VITE_NODE_ENV || 'development';
-};
-
-/**
- * API Base URLs for different environments
- */
-const API_BASE_URLS = {
-  development: import.meta.env.VITE_DEV_API_URL || 'http://127.0.0.1:8000',
-  production: import.meta.env.VITE_PROD_API_URL || 'https://svmps-frontend.onrender.com'
-};
-
-/**
- * Get the current API base URL based on environment
- * @returns {string} The base URL for API calls
- */
-export const getApiBaseUrl = () => {
-  const env = getEnvironment();
-  return API_BASE_URLS[env] || API_BASE_URLS.development;
-};
-
-/**
- * API endpoint configuration
- * All API endpoints are defined here for centralized management
- */
-export const API_ENDPOINTS = {
-  // Users endpoints
-  USERS: '/users/',
-  USER_BY_ID: (id) => `/users/${id}`,
+// Validate and get base URL - STRICT MODE
+const getBaseUrl = () => {
+  // DEBUG: Log all environment variables
+  console.log('🔍 DEBUG - All Vite env vars:', import.meta.env);
+  console.log('🔍 DEBUG - VITE_NODE_ENV:', import.meta.env.VITE_NODE_ENV);
+  console.log('🔍 DEBUG - VITE_DEV_API_URL:', import.meta.env.VITE_DEV_API_URL);
+  console.log('🔍 DEBUG - VITE_PROD_API_URL:', import.meta.env.VITE_PROD_API_URL);
   
-  // Areas endpoints
-  AREAS: '/area/',
-  AREA_BY_ID: (id) => `/area/${id}`,
+  const nodeEnv = import.meta.env.VITE_NODE_ENV;
+  const devUrl = import.meta.env.VITE_DEV_API_URL;
+  const prodUrl = import.meta.env.VITE_PROD_API_URL;
   
-  // Villages endpoints
-  VILLAGES: '/village/',
-  VILLAGE_BY_ID: (id) => `/village/${id}`,
+  // STRICT VALIDATION - No fallbacks allowed
+  if (!nodeEnv) {
+    throw new Error('❌ MISSING: VITE_NODE_ENV is required in .env file!');
+  }
   
-  // Authentication endpoints (if needed in future)
-  AUTH: {
-    LOGIN: '/auth/login',
-    LOGOUT: '/auth/logout',
-    REFRESH: '/auth/refresh'
+  if (nodeEnv !== 'development' && nodeEnv !== 'production') {
+    throw new Error(`❌ INVALID: VITE_NODE_ENV must be 'development' or 'production', got: '${nodeEnv}'`);
+  }
+  
+  if (nodeEnv === 'development') {
+    if (!devUrl) {
+      throw new Error('❌ MISSING: VITE_DEV_API_URL is required when VITE_NODE_ENV=development');
+    }
+    console.log('✅ Environment: development');
+    console.log('✅ API URL:', devUrl);
+    return devUrl;
+  }
+  
+  if (nodeEnv === 'production') {
+    if (!prodUrl) {
+      throw new Error('❌ MISSING: VITE_PROD_API_URL is required when VITE_NODE_ENV=production');
+    }
+    console.log('✅ Environment: production');
+    console.log('✅ API URL:', prodUrl);
+    return prodUrl;
   }
 };
 
-/**
- * Get complete URL for an endpoint
- * @param {string} endpoint - The endpoint path (use API_ENDPOINTS constants)
- * @returns {string} Complete URL with base URL and endpoint
- */
-export const getApiUrl = (endpoint) => {
-  const baseUrl = getApiBaseUrl();
-  return `${baseUrl}${endpoint}`;
-};
-
-/**
- * Convenience functions for common API URLs
- */
+// Simple API URLs
 export const API_URLS = {
   // Users
-  getAllUsers: () => getApiUrl(API_ENDPOINTS.USERS),
-  getUserById: (id) => getApiUrl(API_ENDPOINTS.USER_BY_ID(id)),
-  createUser: () => getApiUrl(API_ENDPOINTS.USERS),
-  updateUser: (id) => getApiUrl(API_ENDPOINTS.USER_BY_ID(id)),
-  deleteUser: (id) => getApiUrl(API_ENDPOINTS.USER_BY_ID(id)),
+  getAllUsers: () => `${getBaseUrl()}/users/`,
+  getUserById: (id) => `${getBaseUrl()}/users/${id}`,
+  createUser: () => `${getBaseUrl()}/users/`,
+  updateUser: (id) => `${getBaseUrl()}/users/${id}`,
+  deleteUser: (id) => `${getBaseUrl()}/users/${id}`,
+  getUserStats: () => `${getBaseUrl()}/users/stats`,
   
   // Areas
-  getAllAreas: () => getApiUrl(API_ENDPOINTS.AREAS),
-  getAreaById: (id) => getApiUrl(API_ENDPOINTS.AREA_BY_ID(id)),
-  createArea: () => getApiUrl(API_ENDPOINTS.AREAS),
-  deleteArea: (id) => getApiUrl(API_ENDPOINTS.AREA_BY_ID(id)),
+  getAllAreas: () => `${getBaseUrl()}/area/`,
+  getAreaById: (id) => `${getBaseUrl()}/area/${id}`,
+  createArea: () => `${getBaseUrl()}/area/`,
+  deleteArea: (id) => `${getBaseUrl()}/area/${id}`,
   
   // Villages
-  getAllVillages: () => getApiUrl(API_ENDPOINTS.VILLAGES),
-  getVillageById: (id) => getApiUrl(API_ENDPOINTS.VILLAGE_BY_ID(id)),
-  createVillage: () => getApiUrl(API_ENDPOINTS.VILLAGES),
-  deleteVillage: (id) => getApiUrl(API_ENDPOINTS.VILLAGE_BY_ID(id))
-};
-
-/**
- * Environment information for debugging
- */
-export const ENV_INFO = {
-  current: getEnvironment(),
-  baseUrl: getApiBaseUrl(),
-  isDevelopment: () => getEnvironment() === 'development',
-  isProduction: () => getEnvironment() === 'production'
-};
-
-// Default export for backward compatibility
-export default {
-  getApiBaseUrl,
-  getApiUrl,
-  API_ENDPOINTS,
-  API_URLS,
-  ENV_INFO
+  getAllVillages: () => `${getBaseUrl()}/village/`,
+  getVillageById: (id) => `${getBaseUrl()}/village/${id}`,
+  createVillage: () => `${getBaseUrl()}/village/`,
+  deleteVillage: (id) => `${getBaseUrl()}/village/${id}`
 };

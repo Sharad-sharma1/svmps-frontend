@@ -1,12 +1,12 @@
 import { createHashRouter, RouterProvider } from 'react-router-dom'  // changed from createBrowserRouter
-import Home from '../views/home'
-import Addarea from '../views/addarea'
-import Addvillage from '../views/addvillage'
+import Home from '../views/home/Home'
+import Addarea from '../views/addarea/AddArea'
+import Addvillage from '../views/addvillage/AddVillage'
 import Navbar from '../navbar/Index'
 import Login from '../login/Login'
-import Showuser from '../views/showuser/Index'
-import Printuser from '../views/printdata/Index'
-import Adduser from '../views/adduser/Index'
+import Showuser from '../views/showuser/ShowUser'
+import Printuser from '../views/printdata/PrintData'
+import Adduser from '../views/adduser/AddUser'
 
 const router = createHashRouter(
   [

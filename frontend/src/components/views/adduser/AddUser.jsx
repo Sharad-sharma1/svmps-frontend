@@ -4,7 +4,7 @@ import AsyncSelect from "react-select/async";
 import { API_URLS } from "../../../utils/fetchurl";
 import "./adduser.css";
 
-const Adduser = () => {
+const AddUser = () => {
   const [formData, setFormData] = useState({
     usercode: "",
     name: "",
@@ -205,7 +205,8 @@ const Adduser = () => {
           <option value="Siddhpur">Siddhpur</option>
         </select>
 
-        <div className="receipt-section">
+        {/* Receipt section temporarily commented out */}
+        {/* <div className="receipt-section">
           <label>
             Receipt Issued?
             <input
@@ -218,7 +219,7 @@ const Adduser = () => {
           <input name="receipt_no" value={formData.receipt_no} onChange={handleChange} placeholder="Receipt No" />
           <input name="receipt_date" type="date" value={formData.receipt_date} onChange={handleChange} />
           <input name="receipt_amt" type="number" value={formData.receipt_amt} onChange={handleChange} placeholder="Amount" />
-        </div>
+        </div> */}
 
         <button type="submit">Create User</button>
         {message && <p>{message}</p>}
@@ -227,4 +228,4 @@ const Adduser = () => {
   );
 };
 
-export default Adduser;
+export default AddUser;

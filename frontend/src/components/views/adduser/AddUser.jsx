@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import axios from "axios";
 import AsyncSelect from "react-select/async";
+import { API_URLS } from "../../../utils/fetchurl";
 import "./adduser.css";
 
-const Adduser = () => {
+const AddUser = () => {
   const [formData, setFormData] = useState({
     usercode: "",
     name: "",
@@ -54,7 +55,7 @@ const Adduser = () => {
     });
 
     try {
-      await axios.post("https://svmps-frontend.onrender.com/users/", cleanedData);
+      await axios.post(API_URLS.createUser(), cleanedData);
       setMessage("✅ User created successfully!");
       setFormData({
         usercode: "",
@@ -100,7 +101,7 @@ const Adduser = () => {
 
   const loadAreaOptions = async (inputValue) => {
     try {
-      const res = await axios.get("https://svmps-frontend.onrender.com/area/", {
+      const res = await axios.get(API_URLS.getAllAreas(), {
         params: { area: inputValue }
       });
       return res.data.data.map((area) => ({
@@ -115,7 +116,7 @@ const Adduser = () => {
 
   const loadVillageOptions = async (inputValue) => {
     try {
-      const res = await axios.get("https://svmps-frontend.onrender.com/village/", {
+      const res = await axios.get(API_URLS.getAllVillages(), {
         params: { village: inputValue }
       });
       return res.data.data.map((village) => ({
@@ -204,7 +205,8 @@ const Adduser = () => {
           <option value="Siddhpur">Siddhpur</option>
         </select>
 
-        <div className="receipt-section">
+        {/* Receipt section temporarily commented out */}
+        {/* <div className="receipt-section">
           <label>
             Receipt Issued?
             <input
@@ -217,7 +219,7 @@ const Adduser = () => {
           <input name="receipt_no" value={formData.receipt_no} onChange={handleChange} placeholder="Receipt No" />
           <input name="receipt_date" type="date" value={formData.receipt_date} onChange={handleChange} />
           <input name="receipt_amt" type="number" value={formData.receipt_amt} onChange={handleChange} placeholder="Amount" />
-        </div>
+        </div> */}
 
         <button type="submit">Create User</button>
         {message && <p>{message}</p>}
@@ -226,4 +228,4 @@ const Adduser = () => {
   );
 };
 
-export default Adduser;
+export default AddUser;

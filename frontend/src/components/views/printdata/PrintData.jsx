@@ -1,9 +1,9 @@
 import React from 'react'
 
-const Printuser = () => {
+const PrintData = () => {
   return (
     <div>Receipt</div>
   )
 }
 
-export default Printuser
+export default PrintData

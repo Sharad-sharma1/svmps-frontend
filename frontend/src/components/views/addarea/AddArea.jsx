@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { API_URLS } from "../../../utils/fetchurl";
+import Pagination from "../../common/Pagination";
 import "./Area.css";
 
-const Addarea = () => {
+const AddArea = () => {
   const [areas, setAreas] = useState([]);
   const [search, setSearch] = useState("");
   const [newArea, setNewArea] = useState("");
@@ -12,7 +14,7 @@ const Addarea = () => {
 
   const fetchAreas = async (page = 1, searchValue = "") => {
     try {
-      const response = await axios.get("https://svmps-frontend.onrender.com/area/", {
+      const response = await axios.get(API_URLS.getAllAreas(), {
         params: {
           page_num: page,
           area: searchValue || undefined,
@@ -32,7 +34,7 @@ const Addarea = () => {
   const handleAddArea = async () => {
     if (newArea.trim()) {
       try {
-        await axios.post("https://svmps-frontend.onrender.com/area/", {
+        await axios.post(API_URLS.createArea(), {
           area: newArea.trim(),
         });
         setNewArea("");
@@ -45,7 +47,7 @@ const Addarea = () => {
 
   const handleDeleteArea = async (id) => {
     try {
-      await axios.delete(`https://svmps-frontend.onrender.com/area/${id}`);
+      await axios.delete(API_URLS.deleteArea(id));
       fetchAreas(currentPage, search);
     } catch (error) {
       alert("Error deleting area.");
@@ -90,7 +92,7 @@ const Addarea = () => {
                   className="delete-button"
                   onClick={() => handleDeleteArea(area.area_id)}
                 >
-                  ❌
+                  ×
                 </button>
               </li>
             ))
@@ -100,22 +102,14 @@ const Addarea = () => {
         </ul>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="pagination">
-            {Array.from({ length: totalPages }, (_, i) => (
-              <button
-                key={i + 1}
-                onClick={() => setCurrentPage(i + 1)}
-                className={currentPage === i + 1 ? "active" : ""}
-              >
-                {i + 1}
-              </button>
-            ))}
-          </div>
-        )}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );
 };
 
-export default Addarea;
+export default AddArea;

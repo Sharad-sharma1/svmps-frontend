@@ -25,8 +25,8 @@ const getBaseUrl = () => {
     if (!devUrl) {
       throw new Error('❌ MISSING: VITE_DEV_API_URL is required when VITE_NODE_ENV=development');
     }
-    console.log('✅ Environment: development');
-    console.log('✅ API URL:', devUrl);
+    console.log('✅ 1. Environment: development');
+    console.log('✅ 2. API URL:', devUrl);
     return devUrl;
   }
   
@@ -34,8 +34,8 @@ const getBaseUrl = () => {
     if (!prodUrl) {
       throw new Error('❌ MISSING: VITE_PROD_API_URL is required when VITE_NODE_ENV=production');
     }
-    console.log('✅ Environment: production');
-    console.log('✅ API URL:', prodUrl);
+    console.log('✅ 3. Environment: production');
+    console.log('✅ 4. API URL:', prodUrl);
     return prodUrl;
   }
 };

@@ -6,13 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from collections import defaultdict
-from io import BytesIO
+from io import BytesIO, StringIO
 
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, PageBreak, KeepTogether
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from sqlalchemy import or_
+import pandas as pd
 
 import models
 from database import engine, SessionLocal
@@ -192,11 +193,14 @@ def add_page_number(canvas, doc):
 def read_users(
     db: db_dependency,
     page_num: Optional[int] = 1,
+    page_size: Optional[int] = 10,
     name: Optional[str] = Query(None),
     type_filter: Optional[List[str]] = Query(None),
     area_ids: Optional[List[int]] = Query(None),
     village_ids: Optional[List[int]] = Query(None),
-    pdf: Optional[bool] = False
+    user_ids: Optional[List[int]] = Query(None),
+    pdf: Optional[bool] = False,
+    csv: Optional[bool] = False
 ):
     query = db.query(models.User).options(joinedload(models.User.area), joinedload(models.User.village)).filter(models.User.delete_flag == False)
 
@@ -220,6 +224,10 @@ def read_users(
     if village_ids:
         query = query.filter(models.User.fk_village_id.in_(village_ids))
 
+    # Filter by specific user IDs if provided (for selected users download)
+    if user_ids:
+        query = query.filter(models.User.user_id.in_(user_ids))
+
     if pdf:
         users = (
             query
@@ -232,20 +240,38 @@ def read_users(
         )
 
         buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, title="User Report")
+        doc = SimpleDocTemplate(buffer, pagesize=A4, title="User Report", 
+                              leftMargin=30, rightMargin=30, topMargin=40, bottomMargin=40)
         elements = []
 
         styles = getSampleStyleSheet()
-        red_bold = ParagraphStyle(name='RedBold', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, textColor=colors.red)
+        # Current version (previous line spacing):
+        red_normal = ParagraphStyle(name='RedNormal', parent=styles['Normal'], fontName='Helvetica', fontSize=11, textColor=colors.red)
+        
+        # Alternative version (with extra line spacing):
+        # red_normal = ParagraphStyle(name='RedNormal', parent=styles['Normal'], fontName='Helvetica', fontSize=11, textColor=colors.red, leading=14, spaceAfter=6)
 
+        # Previous version (more congested):
+        # table_style = TableStyle([
+        #     ('TEXTCOLOR', (0, 0), (-1, -1), colors.red),
+        #     ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+        #     ('FONTSIZE', (0, 0), (-1, -1), 11),
+        #     ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        #     ('TOPPADDING', (0, 0), (-1, -1), 8),
+        #     ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        #     ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        #     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        # ])
+        
+        # Current version (optimized spacing):
         table_style = TableStyle([
             ('TEXTCOLOR', (0, 0), (-1, -1), colors.red),
             ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 11),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 0), (-1, -1), 12),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
         ])
 
@@ -264,7 +290,7 @@ def read_users(
             header_para = Paragraph(f"<b>Type: {user_type}</b>", ParagraphStyle(
                 name='HeaderStyle',
                 fontName='Helvetica-Bold',
-                fontSize=12,
+                fontSize=11,
                 textColor=colors.red,
                 alignment=1,  # centered
                 spaceAfter=10,
@@ -275,14 +301,18 @@ def read_users(
             current_row = []
             for u in group_users:
                 name = f"{u.name} {u.father_or_husband_name or ''} {u.surname or ''}"
+                # Generate user code: SMHLGN-(Type)-(VILLAGE)-(ID)
+                village_name = u.village.village if u.village else 'UNKNOWN'
+                user_code = f"SMHLGN-{u.type or 'UNKNOWN'}-{village_name}-{u.user_id}"
+                
                 para_text = f"""
                     TO: {u.area.area if u.area else ''}<br/>
-                    <b>NAME:</b> {name}<br/>
-                    <b>ADDRESS:</b> {u.address or ''}<br/>
-                    <b>MOBILE:</b> {u.mobile_no1 or ''} / {u.mobile_no2 or ''}<br/>
-                    <b>VILLAGE:</b> {u.village.village if u.village else ''}
+                    NAME: {name}<br/>
+                    ADDRESS: {u.address or ''} - {u.pincode or ''}<br/>
+                    MOBILE: {u.mobile_no1 or ''} / {u.mobile_no2 or ''}<br/>
+                    <b>{user_code}</b>
                 """
-                para = Paragraph(para_text, red_bold)
+                para = Paragraph(para_text, red_normal)
                 if len(current_row) == 2:
                     rows.append(current_row)
                     current_row = [para]
@@ -291,7 +321,7 @@ def read_users(
             if current_row:
                 rows.append(current_row)
 
-            table = Table(rows, colWidths=[260, 260])
+            table = Table(rows, colWidths=[280, 280])
             table.setStyle(table_style)
 
             group_block.append(table)
@@ -303,6 +333,65 @@ def read_users(
         doc.build(elements, onFirstPage=add_page_number, onLaterPages=add_page_number)
         buffer.seek(0)
         return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=users_report.pdf"})
+
+    if csv:
+        users = (
+            query
+            .join(models.Village, models.User.fk_village_id == models.Village.village_id, isouter=True)
+            .join(models.Area, models.User.fk_area_id == models.Area.area_id, isouter=True)
+            .options(joinedload(models.User.area), joinedload(models.User.village))
+            .filter(models.User.delete_flag == False)
+            .order_by(models.User.type, models.Village.village, models.User.name)
+            .all()
+        )
+
+        # Prepare data for CSV export with all columns from the show user table
+        csv_data = []
+        for u in users:
+            # Generate user code: SMHLGN-(Type)-(VILLAGE)-(ID)
+            village_name = u.village.village if u.village else 'UNKNOWN'
+            user_code = f"SMHLGN-{u.type or 'UNKNOWN'}-{village_name}-{u.user_id}"
+            
+            csv_data.append({
+                "User ID": u.user_id,
+                "Name": u.name or "",
+                "Father/Husband Name": u.father_or_husband_name or "",
+                "Surname": u.surname or "",
+                "Village": u.village.village if u.village else "",
+                "Area": u.area.area if u.area else "",
+                "Status": u.status or "",
+                "Type": u.type or "",
+                "Address": u.address or "",
+                "Pincode": u.pincode or "",
+                "State": u.state or "",
+                "User Code": user_code,
+                "Mother Name": getattr(u, 'mother_name', '') or "",
+                "Gender": getattr(u, 'gender', '') or "",
+                "Birth Date": getattr(u, 'birth_date', '') or "",
+                "Mobile No 1": u.mobile_no1 or "",
+                "Mobile No 2": u.mobile_no2 or "",
+                "Email ID": u.email_id or "",
+                "Occupation": getattr(u, 'occupation', '') or "",
+                "Country": getattr(u, 'country', '') or ""
+            })
+
+        # Create DataFrame and convert to CSV
+        df = pd.DataFrame(csv_data)
+        
+        # Create CSV string buffer
+        csv_buffer = StringIO()
+        df.to_csv(csv_buffer, index=False, encoding='utf-8')
+        csv_buffer.seek(0)
+        
+        # Convert to bytes for streaming response
+        csv_bytes = BytesIO(csv_buffer.getvalue().encode('utf-8'))
+        csv_bytes.seek(0)
+        
+        return StreamingResponse(
+            csv_bytes, 
+            media_type="text/csv", 
+            headers={"Content-Disposition": "attachment; filename=users_report.csv"}
+        )
 
     return {
         "page_num": page_num,
@@ -322,7 +411,7 @@ def read_users(
             "village": u.village.village if u.village else None,
             "type": u.type,
             "status": u.status,
-        } for u in query.join(models.Village, models.User.fk_village_id == models.Village.village_id, isouter=True).join(models.Area, models.User.fk_area_id == models.Area.area_id, isouter=True).order_by(models.User.type, models.Village.village, models.User.name).offset((page_num - 1) * 10).limit(10).all()]
+        } for u in query.join(models.Village, models.User.fk_village_id == models.Village.village_id, isouter=True).join(models.Area, models.User.fk_area_id == models.Area.area_id, isouter=True).order_by(models.User.type, models.Village.village, models.User.name).offset((page_num - 1) * page_size).limit(page_size).all()]
     }
 
 @app.put("/users/{user_id}", response_model=UserUpdate)

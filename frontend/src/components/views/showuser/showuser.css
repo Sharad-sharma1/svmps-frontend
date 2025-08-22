@@ -85,6 +85,41 @@
 }
 
 
+/* Download Buttons */
+.download-buttons {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.download-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.pdf-btn {
+  background-color: #dc2626;
+  color: white;
+}
+
+.pdf-btn:hover {
+  background-color: #b91c1c;
+}
+
+.csv-btn {
+  background-color: #059669;
+  color: white;
+}
+
+.csv-btn:hover {
+  background-color: #047857;
+}
+
 /* Table Wrapper */
 .table-wrapper {
   overflow-x: auto;
@@ -472,7 +507,7 @@ tr {
 /* Pagination Container */
 .pagination-container {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   margin-top: 20px;
   padding: 10px 0;
@@ -480,8 +515,6 @@ tr {
 }
 
 .total-count {
-  position: absolute;
-  left: 0;
   font-size: 0.85rem;
   font-weight: 500;
   color: #374151;
@@ -489,6 +522,83 @@ tr {
   padding: 6px 12px;
   border-radius: 4px;
   border: 1px solid #d1d5db;
+  white-space: nowrap;
+}
+
+/* Selected count styling */
+.selected-count {
+  color: #059669;
+  font-weight: 500;
+  margin-left: 0.5rem;
+}
+
+
+
+.clear-selection-btn {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  margin-left: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.clear-selection-btn:hover {
+  background-color: #dc2626;
+}
+
+/* Controls row styling */
+.controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.page-size-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.page-size-selector label {
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.page-size-selector select {
+  padding: 0.6rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: white;
+  font-size: 0.9rem;
+  color: #374151;
+  cursor: pointer;
+  min-height: 38px;
+  line-height: 1.2;
+}
+
+.page-size-selector select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+@media (max-width: 768px) {
+  .controls-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .page-size-selector {
+    justify-content: center;
+  }
 }
 
 /* Responsive adjustments for pagination container */
@@ -500,6 +610,16 @@ tr {
   }
   
   .total-count {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
+    order: 3;
+  }
+  
+  .page-size-selector {
+    order: 1;
+    font-size: 0.85rem;
+  }
+  
+  .pagination-container > div:nth-child(2) {
+    order: 2;
   }
 }

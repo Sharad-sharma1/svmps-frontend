@@ -19,11 +19,15 @@ const ShowUser = () => {
   const [showEditPopup, setShowEditPopup] = useState(false);
   const [editSelectedArea, setEditSelectedArea] = useState(null);
   const [editSelectedVillage, setEditSelectedVillage] = useState(null);
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
 
   const fetchUsers = async (pageNum = 1, search = "") => {
     try {
       const params = {
         page_num: pageNum,
+        page_size: pageSize,
         name: search,
         type_filter: typeFilters,
         area_ids: selectedAreas.map((a) => a.value),
@@ -38,33 +42,86 @@ const ShowUser = () => {
 
       setUsers(response.data.data);
       setTotalCount(response.data.total_count);
+      // Only clear selections when filters change, not on page navigation
+      // setSelectedUserIds([]);  // Commented out for persistent selection
+      // setSelectAll(false);     // Will be updated based on current page
     } catch (err) {
       if (err.response && err.response.status === 404) {
         setUsers([]);
         setTotalCount(0);
+        setSelectedUserIds([]);
+        setSelectAll(false);
       } else {
         console.error("❌ Failed to fetch users:", err);
       }
     }
   };
 
+  // Handle individual checkbox change
+  const handleCheckboxChange = (userId) => {
+    setSelectedUserIds(prev => {
+      const newSelected = prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId];
+      
+      // Console log the selected IDs for demonstration
+      console.log('Selected User IDs:', newSelected);
+      
+      return newSelected;
+    });
+  };
+
+  // Update select all state when users or selectedUserIds change
+  useEffect(() => {
+    const currentPageUserIds = users.map(user => user.user_id);
+    const allCurrentPageSelected = currentPageUserIds.length > 0 && 
+      currentPageUserIds.every(id => selectedUserIds.includes(id));
+    setSelectAll(allCurrentPageSelected);
+  }, [users, selectedUserIds]);
+
+  // Handle select all checkbox change
+  const handleSelectAllChange = () => {
+    if (selectAll) {
+      // Deselect all
+      setSelectedUserIds([]);
+      setSelectAll(false);
+      console.log('Selected User IDs:', []);
+    } else {
+      // Select all current page users
+      const allUserIds = users.map(user => user.user_id);
+      setSelectedUserIds(allUserIds);
+      setSelectAll(true);
+      console.log('Selected User IDs:', allUserIds);
+    }
+  };
+
   useEffect(() => {
     fetchUsers(page, searchTerm);
-  }, [page, searchTerm, typeFilters, selectedAreas, selectedVillages]);
+  }, [page, searchTerm, typeFilters, selectedAreas, selectedVillages, pageSize]);
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     setPage(1);
+    // Clear selections when search changes
+    setSelectedUserIds([]);
+    setSelectAll(false);
   };
 
   const handleDelete = async (id) => {
-    try {
-      await axios.delete(API_URLS.deleteUser(id));
-      alert("✅ User deleted successfully.");
-      fetchUsers(page, searchTerm);
-    } catch (err) {
-      console.error("❌ Failed to delete user:", err);
-      alert("❌ Failed to delete user.");
+    if (window.confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
+      try {
+        await axios.delete(API_URLS.deleteUser(id));
+        alert("✅ User deleted successfully.");
+        setShowEditPopup(false);
+        setEditUser(null);
+        setEditForm({});
+        setEditSelectedArea(null);
+        setEditSelectedVillage(null);
+        fetchUsers(page, searchTerm);
+      } catch (err) {
+        console.error("❌ Failed to delete user:", err);
+        alert("❌ Failed to delete user.");
+      }
     }
   };
 
@@ -157,32 +214,115 @@ const ShowUser = () => {
 
   const handleDownloadPDF = async () => {
   try {
-    const params = {
-      name: searchTerm,
-      type_filter: typeFilters,
-      area_ids: selectedAreas.map((a) => a.value),
-      village_ids: selectedVillages.map((v) => v.value),
-      pdf: true,
-    };
+    // Check if specific users are selected
+    if (selectedUserIds.length > 0) {
+      // Download only selected users
+      const params = {
+        user_ids: selectedUserIds,
+        pdf: true,
+      };
 
-    const response = await axios.get(API_URLS.getAllUsers(), {
-      params,
-      paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
-      responseType: 'blob',
-    });
+      console.log('📄 PDF Download - Selected Users:', selectedUserIds);
+      console.log('📄 PDF Download - Params:', params);
 
-    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'users_report.pdf');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const response = await axios.get(API_URLS.getAllUsers(), {
+        params,
+        paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
+        responseType: 'blob',
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `selected_users_report_${selectedUserIds.length}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      // Download all users with current filters
+      const params = {
+        name: searchTerm,
+        type_filter: typeFilters,
+        area_ids: selectedAreas.map((a) => a.value),
+        village_ids: selectedVillages.map((v) => v.value),
+        pdf: true,
+      };
+
+      const response = await axios.get(API_URLS.getAllUsers(), {
+        params,
+        paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
+        responseType: 'blob',
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'users_report.pdf');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   } catch (error) {
     console.error("❌ Failed to download PDF:", error);
     alert("❌ Error downloading PDF.");
   }
 };
+
+  const handleDownloadCSV = async () => {
+    try {
+      // Check if specific users are selected
+      if (selectedUserIds.length > 0) {
+        // Download only selected users
+        const params = {
+          user_ids: selectedUserIds,
+          csv: true,
+        };
+
+        console.log('📊 CSV Download - Selected Users:', selectedUserIds);
+        console.log('📊 CSV Download - Params:', params);
+
+        const response = await axios.get(API_URLS.getAllUsers(), {
+          params,
+          paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
+          responseType: 'blob',
+        });
+
+        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `selected_users_report_${selectedUserIds.length}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // Download all users with current filters
+        const params = {
+          name: searchTerm,
+          type_filter: typeFilters,
+          area_ids: selectedAreas.map((a) => a.value),
+          village_ids: selectedVillages.map((v) => v.value),
+          csv: true,
+        };
+
+        const response = await axios.get(API_URLS.getAllUsers(), {
+          params,
+          paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
+          responseType: 'blob',
+        });
+
+        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'users_report.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error("❌ Failed to download Excel:", error);
+      alert("❌ Error downloading Excel.");
+    }
+  };
 
 
   const loadAreaOptions = async (inputValue) => {
@@ -215,7 +355,7 @@ const ShowUser = () => {
     }
   };
 
-  const totalPages = Math.ceil(totalCount / 10);
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   return (
     <div className="show-user-container">
@@ -232,33 +372,21 @@ const ShowUser = () => {
     {["ALL", "NRS", "COMMITEE", "SIDDHPUR"].map((type) => (
       <button
         key={type}
-        onClick={() =>
+        onClick={() => {
           setTypeFilters((prev) =>
             prev.includes(type)
               ? prev.filter((t) => t !== type)
               : [...prev, type]
-          )
-        }
+          );
+          // Clear selections when filters change
+          setSelectedUserIds([]);
+          setSelectAll(false);
+        }}
         className={typeFilters.includes(type) ? "active-type" : ""}
       >
         {type}
       </button>
     ))}
-  </div>
-
-  {/* Area Dropdown */}
-  <div className="select-wrapper">
-    <AsyncSelect
-      isMulti
-      cacheOptions
-      defaultOptions
-      loadOptions={loadAreaOptions}
-      onChange={(selected) => setSelectedAreas(selected || [])}
-      value={selectedAreas}
-      placeholder="Filter by Area"
-      classNamePrefix="react-select-menu"
-      menuPortalTarget={document.body}
-    />
   </div>
 
   {/* Village Dropdown */}
@@ -268,14 +396,53 @@ const ShowUser = () => {
       cacheOptions
       defaultOptions
       loadOptions={loadVillageOptions}
-      onChange={(selected) => setSelectedVillages(selected || [])}
+      onChange={(selected) => {
+        setSelectedVillages(selected || []);
+        // Clear selections when filters change
+        setSelectedUserIds([]);
+        setSelectAll(false);
+      }}
       value={selectedVillages}
       placeholder="Filter by Village"
       classNamePrefix="react-select-menu"
       menuPortalTarget={document.body}
     />
   </div>
-  <button className="download-btn" onClick={handleDownloadPDF}>Download PDF</button>
+
+  {/* Area Dropdown */}
+  <div className="select-wrapper">
+    <AsyncSelect
+      isMulti
+      cacheOptions
+      defaultOptions
+      loadOptions={loadAreaOptions}
+      onChange={(selected) => {
+        setSelectedAreas(selected || []);
+        // Clear selections when filters change
+        setSelectedUserIds([]);
+        setSelectAll(false);
+      }}
+      value={selectedAreas}
+      placeholder="Filter by Area"
+      classNamePrefix="react-select-menu"
+      menuPortalTarget={document.body}
+    />
+  </div>
+  
+  <div className="download-buttons">
+    <button className="download-btn pdf-btn" onClick={handleDownloadPDF}>
+      {selectedUserIds.length > 0 
+        ? `Download PDF (${selectedUserIds.length} selected)` 
+        : 'Download PDF (All)'
+      }
+    </button>
+    <button className="download-btn csv-btn" onClick={handleDownloadCSV}>
+      {selectedUserIds.length > 0 
+        ? `Download Excel (${selectedUserIds.length} selected)` 
+        : 'Download Excel (All)'
+      }
+    </button>
+  </div>
 
 </div>
 
@@ -284,6 +451,14 @@ const ShowUser = () => {
         <table className="user-table">
           <thead>
             <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  checked={selectAll}
+                  onChange={handleSelectAllChange}
+                  title="Select All"
+                />
+              </th>
               <th>Actions</th>
               <th>ID</th>
               <th>Name</th>
@@ -312,8 +487,14 @@ const ShowUser = () => {
               users.map((user) => (
                 <tr key={user.user_id}>
                   <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedUserIds.includes(user.user_id)}
+                      onChange={() => handleCheckboxChange(user.user_id)}
+                    />
+                  </td>
+                  <td>
                     <button className="edit-btn" onClick={() => handleEditClick(user)}>Edit</button>
-                    <button className="delete-btn" onClick={() => handleDelete(user.user_id)}>Delete</button>
                   </td>
                   <td>{user.user_id}</td>
                   <td>{user.name || "-"}</td>
@@ -339,7 +520,7 @@ const ShowUser = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="21" className="no-data">No users found</td>
+                <td colSpan="22" className="no-data">No users found</td>
               </tr>
             )}
           </tbody>
@@ -347,14 +528,49 @@ const ShowUser = () => {
       </div>
 
       <div className="pagination-container">
-        <div className="total-count">
-          Total Records: {totalCount}
+        <div className="page-size-selector">
+          <label htmlFor="pageSize">Show </label>
+          <select 
+            id="pageSize"
+            value={pageSize} 
+            onChange={(e) => {
+              const newSize = parseInt(e.target.value);
+              setPageSize(newSize);
+              setPage(1); // Reset to first page when changing page size
+            }}
+          >
+            <option value={10}>10</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+          </select>
+          <span> per page</span>
         </div>
+        
         <Pagination
           currentPage={page}
           totalPages={totalPages}
           onPageChange={setPage}
         />
+        
+        <div className="total-count">
+          Total Records: {totalCount}
+          {selectedUserIds.length > 0 && (
+            <span className="selected-count">
+              | Selected: {selectedUserIds.length} users
+              <button 
+                className="clear-selection-btn"
+                onClick={() => {
+                  setSelectedUserIds([]);
+                  setSelectAll(false);
+                }}
+                title="Clear all selections"
+              >
+                ✕ Clear
+              </button>
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Edit User Popup */}
@@ -392,12 +608,16 @@ const ShowUser = () => {
                 onChange={handleEditChange} 
                 placeholder="Mother Name" 
               />
-              <input 
+              <select 
                 name="gender" 
                 value={editForm.gender || ""} 
-                onChange={handleEditChange} 
-                placeholder="Gender" 
-              />
+                onChange={handleEditChange}
+              >
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
               <input 
                 name="birth_date" 
                 type="date" 
@@ -526,6 +746,7 @@ const ShowUser = () => {
 
               <div className="popup-buttons">
                 <button type="submit" className="save-btn">Update User</button>
+                <button type="button" className="delete-btn" onClick={() => handleDelete(editUser)}>Delete User</button>
                 <button type="button" className="cancel-btn" onClick={handleCloseEditPopup}>Cancel</button>
               </div>
             </form>

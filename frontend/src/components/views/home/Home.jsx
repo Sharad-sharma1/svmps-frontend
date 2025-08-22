@@ -31,11 +31,11 @@ const Home = () => {
       <div className="cards-grid">
         <Link to="/area" className="card">
           <h3 className="card-title">Area</h3>
-          <p className="card-desc">Create and Delete Areas</p>
+          <p className="card-desc">Create and Delete Area</p>
         </Link>
         <Link to="/village" className="card">
           <h3 className="card-title">Village</h3>
-          <p className="card-desc">Create and Delete Villages</p>
+          <p className="card-desc">Create and Delete Village</p>
         </Link>
         <Link to="/user" className="card">
           <h3 className="card-title">Create User</h3>

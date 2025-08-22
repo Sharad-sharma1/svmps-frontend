@@ -26,7 +26,7 @@ const AddUser = () => {
     state: "",
     email_id: "",
     status: "Active",
-    type: "All",
+    type: "ALL",
     receipt_flag: false,
     receipt_no: "",
     receipt_date: "",
@@ -78,7 +78,7 @@ const AddUser = () => {
         state: "",
         email_id: "",
         status: "Active",
-        type: "All",
+        type: "ALL",
         receipt_flag: false,
         receipt_no: "",
         receipt_date: "",
@@ -137,7 +137,12 @@ const AddUser = () => {
         <input name="surname" value={formData.surname} onChange={handleChange} placeholder="Surname" />
         <input name="father_or_husband_name" value={formData.father_or_husband_name} onChange={handleChange} placeholder="Father/Husband Name" />
         <input name="mother_name" value={formData.mother_name} onChange={handleChange} placeholder="Mother Name" />
-        <input name="gender" value={formData.gender} onChange={handleChange} placeholder="Gender" />
+        <select name="gender" value={formData.gender} onChange={handleChange} style={{ width: "180px" }}>
+          <option value="">Select Gender</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+        </select>
         <input name="birth_date" type="date" value={formData.birth_date} onChange={handleChange} />
         <input name="mobile_no1" value={formData.mobile_no1} onChange={handleChange} placeholder="Mobile 1" />
         <input name="mobile_no2" value={formData.mobile_no2} onChange={handleChange} placeholder="Mobile 2" />
@@ -200,7 +205,7 @@ const AddUser = () => {
 
         <select name="type" value={formData.type} onChange={handleChange} style={{ width: "180px" }}>
           <option value="NRS">NRS</option>
-          <option value="All">All</option>
+          <option value="ALL">ALL</option>
           <option value="Commitee">Commitee</option>
           <option value="Siddhpur">Siddhpur</option>
         </select>

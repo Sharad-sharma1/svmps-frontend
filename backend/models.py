@@ -78,7 +78,7 @@ class User(Base):
     receipt_amt = Column(DECIMAL(10, 2))
 
     status = Column(user_status_enum, default="Active", nullable=True)
-    type = Column(user_type_enum, default="All", nullable=True)
+    type = Column(user_type_enum, default="ALL", nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

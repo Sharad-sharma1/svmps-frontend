@@ -3,8 +3,11 @@ import axios from "axios";
 import qs from "qs";
 import AsyncSelect from "react-select/async";
 import { API_URLS } from "../../../utils/fetchurl";
+import { useBigDataApiCall, useRegularApiCall } from "../../../hooks/useApiCall";
+import LoadingOverlay from "../../common/LoadingOverlay";
 import Pagination from "../../common/Pagination";
 import "./Showuser.css";
+import "./SearchButtons.css";
 
 const ShowUser = () => {
   const [users, setUsers] = useState([]);
@@ -23,28 +26,44 @@ const ShowUser = () => {
   const [selectAll, setSelectAll] = useState(false);
   const [pageSize, setPageSize] = useState(10);
 
+  // API call hooks
+  const { loading: usersLoading, error: usersError, execute: executeUsersCall, reset: resetUsersCall } = useBigDataApiCall();
+  const { loading: actionLoading, error: actionError, execute: executeActionCall, reset: resetActionCall } = useRegularApiCall();
+
   const fetchUsers = async (pageNum = 1, search = "") => {
     try {
-      const params = {
-        page_num: pageNum,
-        page_size: pageSize,
-        name: search,
-        type_filter: typeFilters,
-        area_ids: selectedAreas.map((a) => a.value),
-        village_ids: selectedVillages.map((v) => v.value),
-      };
+      await executeUsersCall(
+        ({ signal }) => {
+          const params = {
+            page_num: pageNum,
+            page_size: pageSize,
+            name: search,
+            type_filter: typeFilters,
+            area_ids: selectedAreas.map((a) => a.value),
+            village_ids: selectedVillages.map((v) => v.value),
+          };
 
-      const response = await axios.get(API_URLS.getAllUsers(), {
-        params,
-        paramsSerializer: (params) =>
-          qs.stringify(params, { arrayFormat: "repeat" }),
-      });
-
-      setUsers(response.data.data);
-      setTotalCount(response.data.total_count);
-      // Only clear selections when filters change, not on page navigation
-      // setSelectedUserIds([]);  // Commented out for persistent selection
-      // setSelectAll(false);     // Will be updated based on current page
+          return axios.get(API_URLS.getAllUsers(), {
+            params,
+            signal,
+            paramsSerializer: (params) =>
+              qs.stringify(params, { arrayFormat: "repeat" }),
+          });
+        },
+        {
+          loadingMessage: "Loading users data... This may take up to 60 seconds for large datasets.",
+          onSuccess: (response) => {
+            setUsers(response.data.data);
+            setTotalCount(response.data.total_count);
+            // Only clear selections when filters change, not on page navigation
+            // setSelectedUserIds([]);  // Commented out for persistent selection
+            // setSelectAll(false);     // Will be updated based on current page
+          },
+          onError: (error) => {
+            console.error('Failed to fetch users:', error);
+          }
+        }
+      );
     } catch (err) {
       if (err.response && err.response.status === 404) {
         setUsers([]);
@@ -95,14 +114,38 @@ const ShowUser = () => {
     }
   };
 
+  // Only fetch users on page change or initial load, not on filter changes
   useEffect(() => {
     fetchUsers(page, searchTerm);
-  }, [page, searchTerm, typeFilters, selectedAreas, selectedVillages, pageSize]);
+  }, [page, pageSize]); // Removed automatic filter dependencies
+
+  // Initial load
+  useEffect(() => {
+    fetchUsers(1, "");
+  }, []);
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
+    // Don't automatically trigger search or reset page
+  };
+
+  // New function to handle search button click
+  const handleSearchClick = () => {
+    setPage(1); // Reset to first page when search is triggered
+    fetchUsers(1, searchTerm);
+    // Clear selections when search is triggered
+    setSelectedUserIds([]);
+    setSelectAll(false);
+  };
+
+  // Clear all filters function
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setTypeFilters([]);
+    setSelectedAreas([]);
+    setSelectedVillages([]);
     setPage(1);
-    // Clear selections when search changes
+    fetchUsers(1, "");
     setSelectedUserIds([]);
     setSelectAll(false);
   };
@@ -110,17 +153,27 @@ const ShowUser = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
       try {
-        await axios.delete(API_URLS.deleteUser(id));
-        alert("✅ User deleted successfully.");
-        setShowEditPopup(false);
-        setEditUser(null);
-        setEditForm({});
-        setEditSelectedArea(null);
-        setEditSelectedVillage(null);
-        fetchUsers(page, searchTerm);
+        await executeActionCall(
+          ({ signal }) => axios.delete(API_URLS.deleteUser(id), { signal }),
+          {
+            loadingMessage: "Deleting user...",
+            onSuccess: () => {
+              alert("✅ User deleted successfully.");
+              setShowEditPopup(false);
+              setEditUser(null);
+              setEditForm({});
+              setEditSelectedArea(null);
+              setEditSelectedVillage(null);
+              fetchUsers(page, searchTerm);
+            },
+            onError: (error) => {
+              console.error("❌ Failed to delete user:", error);
+              alert("❌ Failed to delete user.");
+            }
+          }
+        );
       } catch (err) {
-        console.error("❌ Failed to delete user:", err);
-        alert("❌ Failed to delete user.");
+        // Error handled by hook
       }
     }
   };
@@ -191,16 +244,26 @@ const ShowUser = () => {
 
   const handleEditSubmit = async () => {
     try {
-      await axios.put(API_URLS.updateUser(editUser), editForm);
-      alert("✅ User updated successfully.");
-      setEditUser(null);
-      setShowEditPopup(false);
-      setEditSelectedArea(null);
-      setEditSelectedVillage(null);
-      fetchUsers(page, searchTerm);
+      await executeActionCall(
+        ({ signal }) => axios.put(API_URLS.updateUser(editUser), editForm, { signal }),
+        {
+          loadingMessage: "Updating user...",
+          onSuccess: () => {
+            alert("✅ User updated successfully.");
+            setEditUser(null);
+            setShowEditPopup(false);
+            setEditSelectedArea(null);
+            setEditSelectedVillage(null);
+            fetchUsers(page, searchTerm);
+          },
+          onError: (error) => {
+            console.error("❌ Failed to update user:", error.originalError?.response?.data || error);
+            alert("❌ Failed to update user.");
+          }
+        }
+      );
     } catch (err) {
-      console.error("❌ Failed to update user:", err.response?.data || err);
-      alert("❌ Failed to update user.");
+      // Error handled by hook
     }
   };
 
@@ -357,94 +420,136 @@ const ShowUser = () => {
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
+  // Loading and error handlers
+  const handleUsersRetry = () => {
+    resetUsersCall();
+    fetchUsers(page, searchTerm);
+  };
+
+  const handleActionRetry = () => {
+    resetActionCall();
+  };
+
   return (
-    <div className="show-user-container">
-      <h2>Show User</h2>
-      <div className="filters">
-  <input
-    type="text"
-    placeholder="Search by Name / Father Name / Mobile"
-    value={searchTerm}
-    onChange={handleSearchChange}
-  />
+    <>
+      <LoadingOverlay 
+        isVisible={usersLoading}
+        message="Loading users data... This may take up to 60 seconds for large datasets."
+      />
+      <LoadingOverlay 
+        isVisible={usersError && !usersLoading}
+        message={usersError?.message}
+        isError={true}
+        onRetry={usersError?.canRetry ? handleUsersRetry : null}
+      />
+      <LoadingOverlay 
+        isVisible={actionLoading}
+        message="Processing..."
+      />
+      <LoadingOverlay 
+        isVisible={actionError && !actionLoading}
+        message={actionError?.message}
+        isError={true}
+        onRetry={actionError?.canRetry ? handleActionRetry : null}
+      />
 
-  <div className="type-buttons">
-    {["ALL", "NRS", "COMMITEE", "SIDDHPUR"].map((type) => (
-      <button
-        key={type}
-        onClick={() => {
-          setTypeFilters((prev) =>
-            prev.includes(type)
-              ? prev.filter((t) => t !== type)
-              : [...prev, type]
-          );
-          // Clear selections when filters change
-          setSelectedUserIds([]);
-          setSelectAll(false);
-        }}
-        className={typeFilters.includes(type) ? "active-type" : ""}
-      >
-        {type}
-      </button>
-    ))}
-  </div>
+      <div className="show-user-container">
+        <h2>Show User</h2>
+        
+        {/* Row 1: Search input + Action buttons + Download buttons */}
+        <div className="filter-row compact-row row-one">
+          <input
+            type="text"
+            className="search-input mini"
+            placeholder="Search users..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSearchClick();
+              }
+            }}
+          />
+          
+          <div className="action-buttons">
+            <button className="search-btn mini" onClick={handleSearchClick}>
+              🔍 Search
+            </button>
+            <button className="clear-btn mini" onClick={handleClearFilters}>
+              🗑️ Clear
+            </button>
+          </div>
+          
+          <div className="download-buttons">
+            <button className="download-btn pdf-btn mini" onClick={handleDownloadPDF}>
+              {selectedUserIds.length > 0 
+                ? `📄 PDF (${selectedUserIds.length})` 
+                : '📄 PDF'
+              }
+            </button>
+            <button className="download-btn csv-btn mini" onClick={handleDownloadCSV}>
+              {selectedUserIds.length > 0 
+                ? `📊 Excel (${selectedUserIds.length})` 
+                : '📊 Excel'
+              }
+            </button>
+          </div>
+        </div>
 
-  {/* Village Dropdown */}
-  <div className="select-wrapper">
-    <AsyncSelect
-      isMulti
-      cacheOptions
-      defaultOptions
-      loadOptions={loadVillageOptions}
-      onChange={(selected) => {
-        setSelectedVillages(selected || []);
-        // Clear selections when filters change
-        setSelectedUserIds([]);
-        setSelectAll(false);
-      }}
-      value={selectedVillages}
-      placeholder="Filter by Village"
-      classNamePrefix="react-select-menu"
-      menuPortalTarget={document.body}
-    />
-  </div>
-
-  {/* Area Dropdown */}
-  <div className="select-wrapper">
-    <AsyncSelect
-      isMulti
-      cacheOptions
-      defaultOptions
-      loadOptions={loadAreaOptions}
-      onChange={(selected) => {
-        setSelectedAreas(selected || []);
-        // Clear selections when filters change
-        setSelectedUserIds([]);
-        setSelectAll(false);
-      }}
-      value={selectedAreas}
-      placeholder="Filter by Area"
-      classNamePrefix="react-select-menu"
-      menuPortalTarget={document.body}
-    />
-  </div>
-  
-  <div className="download-buttons">
-    <button className="download-btn pdf-btn" onClick={handleDownloadPDF}>
-      {selectedUserIds.length > 0 
-        ? `Download PDF (${selectedUserIds.length} selected)` 
-        : 'Download PDF (All)'
-      }
-    </button>
-    <button className="download-btn csv-btn" onClick={handleDownloadCSV}>
-      {selectedUserIds.length > 0 
-        ? `Download Excel (${selectedUserIds.length} selected)` 
-        : 'Download Excel (All)'
-      }
-    </button>
-  </div>
-
-</div>
+        {/* Row 2: Type filters + Area/Village dropdowns */}
+        <div className="filter-row compact-row row-two">
+          <div className="type-buttons">
+            {["ALL", "NRS", "COMMITEE", "SIDDHPUR"].map((type) => (
+              <button
+                key={type}
+                onClick={() => {
+                  setTypeFilters((prev) =>
+                    prev.includes(type)
+                      ? prev.filter((t) => t !== type)
+                      : [...prev, type]
+                  );
+                }}
+                className={`type-btn mini ${typeFilters.includes(type) ? "active-type" : ""}`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+          
+          <div className="dropdowns-section">
+            <div className="select-wrapper mini">
+              <AsyncSelect
+                isMulti
+                cacheOptions
+                defaultOptions
+                loadOptions={loadAreaOptions}
+                onChange={(selected) => {
+                  setSelectedAreas(selected || []);
+                }}
+                value={selectedAreas}
+                placeholder="Area"
+                classNamePrefix="react-select-menu"
+                menuPortalTarget={document.body}
+              />
+            </div>
+            
+            <div className="select-wrapper mini">
+              <AsyncSelect
+                isMulti
+                cacheOptions
+                defaultOptions
+                loadOptions={loadVillageOptions}
+                onChange={(selected) => {
+                  setSelectedVillages(selected || []);
+                }}
+                value={selectedVillages}
+                placeholder="Village"
+                classNamePrefix="react-select-menu"
+                menuPortalTarget={document.body}
+              />
+            </div>
+          </div>
+        </div>
 
 
       <div className="table-wrapper">
@@ -753,7 +858,8 @@ const ShowUser = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
 

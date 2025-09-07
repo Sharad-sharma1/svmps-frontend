@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import axios from "axios";
 import AsyncSelect from "react-select/async";
 import { API_URLS } from "../../../utils/fetchurl";
+import { useRegularApiCall } from "../../../hooks/useApiCall";
+import LoadingOverlay from "../../common/LoadingOverlay";
 import "./adduser.css";
 
 const AddUser = () => {
@@ -35,6 +37,9 @@ const AddUser = () => {
 
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState({});
+  
+  // API call hooks
+  const { loading, error, execute, reset } = useRegularApiCall();
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -55,47 +60,57 @@ const AddUser = () => {
     });
 
     try {
-      await axios.post(API_URLS.createUser(), cleanedData);
-      setMessage("✅ User created successfully!");
-      setFormData({
-        usercode: "",
-        name: "",
-        surname: "",
-        father_or_husband_name: "",
-        mother_name: "",
-        gender: "",
-        birth_date: "",
-        mobile_no1: "",
-        mobile_no2: "",
-        fk_area_id: "",
-        fk_village_id: "",
-        area: "",
-        village: "",
-        address: "",
-        pincode: "",
-        occupation: "",
-        country: "",
-        state: "",
-        email_id: "",
-        status: "Active",
-        type: "ALL",
-        receipt_flag: false,
-        receipt_no: "",
-        receipt_date: "",
-        receipt_amt: "",
-      });
-    } catch (error) {
-      if (error.response && error.response.status === 422) {
-        const fieldErrors = {};
-        error.response.data.detail.forEach((err) => {
-          const field = err.loc[err.loc.length - 1];
-          fieldErrors[field] = err.msg;
-        });
-        setErrors(fieldErrors);
-      } else {
-        console.error(error);
-        setMessage("❌ Error creating user");
-      }
+      await execute(
+        ({ signal }) => axios.post(API_URLS.createUser(), cleanedData, { signal }),
+        {
+          loadingMessage: "Creating user...",
+          onSuccess: () => {
+            setMessage("✅ User created successfully!");
+            setFormData({
+              usercode: "",
+              name: "",
+              surname: "",
+              father_or_husband_name: "",
+              mother_name: "",
+              gender: "",
+              birth_date: "",
+              mobile_no1: "",
+              mobile_no2: "",
+              fk_area_id: "",
+              fk_village_id: "",
+              area: "",
+              village: "",
+              address: "",
+              pincode: "",
+              occupation: "",
+              country: "",
+              state: "",
+              email_id: "",
+              status: "Active",
+              type: "ALL",
+              receipt_flag: false,
+              receipt_no: "",
+              receipt_date: "",
+              receipt_amt: "",
+            });
+          },
+          onError: (error) => {
+            if (error.originalError?.response && error.originalError.response.status === 422) {
+              const fieldErrors = {};
+              error.originalError.response.data.detail.forEach((err) => {
+                const field = err.loc[err.loc.length - 1];
+                fieldErrors[field] = err.msg;
+              });
+              setErrors(fieldErrors);
+            } else {
+              console.error(error);
+              setMessage("❌ Error creating user");
+            }
+          }
+        }
+      );
+    } catch (err) {
+      // Error handled by hook
     }
   };
 
@@ -129,9 +144,25 @@ const AddUser = () => {
     }
   };
 
+  const handleRetry = () => {
+    reset();
+  };
+
   return (
-    <div className="form-container">
-      <h2>Create User</h2>
+    <>
+      <LoadingOverlay 
+        isVisible={loading}
+        message="Creating user..."
+      />
+      <LoadingOverlay 
+        isVisible={error && !loading}
+        message={error?.message}
+        isError={true}
+        onRetry={error?.canRetry ? handleRetry : null}
+      />
+
+      <div className="form-container">
+        <h2>Create User</h2>
       <form onSubmit={handleSubmit}>
         <input name="name" value={formData.name} onChange={handleChange} placeholder="Name" required />
         <input name="surname" value={formData.surname} onChange={handleChange} placeholder="Surname" />
@@ -229,7 +260,8 @@ const AddUser = () => {
         <button type="submit">Create User</button>
         {message && <p>{message}</p>}
       </form>
-    </div>
+      </div>
+    </>
   );
 };
 

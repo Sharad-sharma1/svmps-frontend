@@ -60,38 +60,70 @@ async def read_village(
     page_num: Optional[int] = 1
 ):
     from sqlalchemy import func
+    from sqlalchemy.exc import OperationalError
+    import time
     
     offset = 10 * (page_num - 1)
     
-    # Query with user count
-    query = db.query(
-        models.Village.village_id,
-        models.Village.village,
-        func.count(models.User.user_id).label("user_count")
-    ).outerjoin(
-        models.User,
-        (models.Village.village_id == models.User.fk_village_id) &
-        ((models.User.delete_flag == False) | (models.User.delete_flag == None))
-    ).group_by(
-        models.Village.village_id,
-        models.Village.village
-    )
-    
-    if village:
-        query = query.filter(models.Village.village.ilike(f"%{village}%"))
-    
-    total_count = db.query(models.Village).count()
-    result = query.order_by(models.Village.village).offset(offset).limit(10).all()
-    
-    return {
-        "total_count": total_count,
-        "page_num": page_num,
-        "data": [{
-            "village_id": r.village_id,
-            "village": r.village,
-            "user_count": r.user_count
-        } for r in result]
-    }
+    try:
+        # Query with user count
+        query = db.query(
+            models.Village.village_id,
+            models.Village.village,
+            func.count(models.User.user_id).label("user_count")
+        ).outerjoin(
+            models.User,
+            (models.Village.village_id == models.User.fk_village_id) &
+            ((models.User.delete_flag == False) | (models.User.delete_flag == None))
+        ).group_by(
+            models.Village.village_id,
+            models.Village.village
+        )
+        
+        if village:
+            query = query.filter(models.Village.village.ilike(f"%{village}%"))
+        
+        # Use a single query instead of separate count query to reduce connection load
+        result = query.order_by(models.Village.village).offset(offset).limit(10).all()
+        
+        # Get total count with retry logic
+        max_retries = 3
+        total_count = 0
+        
+        for attempt in range(max_retries):
+            try:
+                if village:
+                    total_count = db.query(models.Village).filter(
+                        models.Village.village.ilike(f"%{village}%")
+                    ).count()
+                else:
+                    total_count = db.query(models.Village).count()
+                break
+            except OperationalError as e:
+                if attempt < max_retries - 1:
+                    time.sleep(0.1 * (attempt + 1))  # Exponential backoff
+                    continue
+                else:
+                    # If count fails after retries, estimate from results
+                    total_count = len(result) if len(result) < 10 else (page_num * 10)
+                    print(f"Count query failed after {max_retries} attempts: {str(e)}")
+        
+        return {
+            "total_count": total_count,
+            "page_num": page_num,
+            "data": [{
+                "village_id": r.village_id,
+                "village": r.village,
+                "user_count": r.user_count
+            } for r in result]
+        }
+        
+    except OperationalError as e:
+        print(f"Database connection error in read_village: {str(e)}")
+        raise HTTPException(
+            status_code=503, 
+            detail="Database connection temporarily unavailable. Please try again."
+        )
 @app.delete("/village/{village_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_village(village_id: int, db: db_dependency):
     db_village = db.query(models.Village).filter(models.Village.village_id == village_id).first()
@@ -300,17 +332,23 @@ def read_users(
             rows = []
             current_row = []
             for u in group_users:
-                name = f"{u.name} {u.father_or_husband_name or ''} {u.surname or ''}"
+                # Clean and concatenate name parts, avoiding extra spaces
+                name_parts = [
+                    (u.name or '').strip(),
+                    (u.father_or_husband_name or '').strip(),
+                    (u.surname or '').strip()
+                ]
+                name = ' '.join(part for part in name_parts if part)
                 # Generate user code: SMHLGN-(Type)-(VILLAGE)-(ID)
                 village_name = u.village.village if u.village else 'UNKNOWN'
                 user_code = f"SMHLGN-{u.type or 'UNKNOWN'}-{village_name}-{u.user_id}"
                 
                 para_text = f"""
-                    TO: {u.area.area if u.area else ''}<br/>
-                    NAME: {name}<br/>
-                    ADDRESS: {u.address or ''} - {u.pincode or ''}<br/>
+                    <b>TO: {u.area.area if u.area else ''}</b><br/>
+                    {name}<br/>
+                    {u.address or ''} - {u.pincode or ''}<br/>
                     MOBILE: {u.mobile_no1 or ''} / {u.mobile_no2 or ''}<br/>
-                    <b>{user_code}</b>
+                    <font size="10">{user_code}</font>
                 """
                 para = Paragraph(para_text, red_normal)
                 if len(current_row) == 2:

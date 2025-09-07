@@ -7,6 +7,7 @@ import Login from '../login/Login'
 import Showuser from '../views/showuser/ShowUser'
 import Printuser from '../views/printdata/PrintData'
 import Adduser from '../views/adduser/AddUser'
+import CreateReceipt from '../views/createreceipt/CreateReceipt'
 
 const router = createHashRouter(
   [
@@ -51,11 +52,19 @@ const router = createHashRouter(
         </div>
     },
     {
-      path: "/printuser",
+      path: "/receipts",
       element:
         <div>
           <Navbar />
           <Printuser />
+        </div>
+    },
+    {
+      path: "/create-receipt",
+      element:
+        <div>
+          <Navbar />
+          <CreateReceipt />
         </div>
     },
     {

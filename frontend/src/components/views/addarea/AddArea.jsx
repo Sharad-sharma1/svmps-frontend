@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { API_URLS } from "../../../utils/fetchurl";
+import { useRegularApiCall } from "../../../hooks/useApiCall";
+import LoadingOverlay from "../../common/LoadingOverlay";
 import Pagination from "../../common/Pagination";
 import "./Area.css";
 
@@ -12,18 +14,33 @@ const AddArea = () => {
   const [totalCount, setTotalCount] = useState(0);
   const areasPerPage = 10;
 
+  // API call hooks
+  const { loading: loadingAreas, error: areasError, execute: executeAreasCall, reset: resetAreasCall } = useRegularApiCall();
+  const { loading: actionLoading, error: actionError, execute: executeActionCall, reset: resetActionCall } = useRegularApiCall();
+
   const fetchAreas = async (page = 1, searchValue = "") => {
     try {
-      const response = await axios.get(API_URLS.getAllAreas(), {
-        params: {
-          page_num: page,
-          area: searchValue || undefined,
-        },
-      });
-      setAreas(response.data.data);
-      setTotalCount(response.data.total_count);
-    } catch (error) {
-      console.error("Error fetching areas:", error);
+      await executeAreasCall(
+        ({ signal }) => axios.get(API_URLS.getAllAreas(), {
+          params: {
+            page_num: page,
+            area: searchValue || undefined,
+          },
+          signal,
+        }),
+        {
+          loadingMessage: "Loading areas...",
+          onSuccess: (response) => {
+            setAreas(response.data.data);
+            setTotalCount(response.data.total_count);
+          },
+          onError: (error) => {
+            console.error("Error fetching areas:", error);
+          }
+        }
+      );
+    } catch (err) {
+      // Error handled by hook
     }
   };
 
@@ -34,30 +51,84 @@ const AddArea = () => {
   const handleAddArea = async () => {
     if (newArea.trim()) {
       try {
-        await axios.post(API_URLS.createArea(), {
-          area: newArea.trim(),
-        });
-        setNewArea("");
-        fetchAreas(currentPage, search);
-      } catch (error) {
-        alert(error.response?.data?.detail || "Error adding area.");
+        await executeActionCall(
+          ({ signal }) => axios.post(API_URLS.createArea(), {
+            area: newArea.trim(),
+          }, { signal }),
+          {
+            loadingMessage: "Adding area...",
+            onSuccess: () => {
+              setNewArea("");
+              fetchAreas(currentPage, search);
+            },
+            onError: (error) => {
+              alert(error.originalError?.response?.data?.detail || "Error adding area.");
+            }
+          }
+        );
+      } catch (err) {
+        // Error handled by hook
       }
     }
   };
 
   const handleDeleteArea = async (id) => {
-    try {
-      await axios.delete(API_URLS.deleteArea(id));
-      fetchAreas(currentPage, search);
-    } catch (error) {
-      alert("Error deleting area.");
+    if (window.confirm("Are you sure you want to delete this area?")) {
+      try {
+        await executeActionCall(
+          ({ signal }) => axios.delete(API_URLS.deleteArea(id), { signal }),
+          {
+            loadingMessage: "Deleting area...",
+            onSuccess: () => {
+              fetchAreas(currentPage, search);
+            },
+            onError: (error) => {
+              alert("Error deleting area.");
+            }
+          }
+        );
+      } catch (err) {
+        // Error handled by hook
+      }
     }
   };
 
   const totalPages = Math.ceil(totalCount / areasPerPage);
 
+  // Loading and error handlers
+  const handleAreasRetry = () => {
+    resetAreasCall();
+    fetchAreas(currentPage, search);
+  };
+
+  const handleActionRetry = () => {
+    resetActionCall();
+  };
+
   return (
-    <div className="addarea-container">
+    <>
+      <LoadingOverlay 
+        isVisible={loadingAreas}
+        message="Loading areas..."
+      />
+      <LoadingOverlay 
+        isVisible={areasError && !loadingAreas}
+        message={areasError?.message}
+        isError={true}
+        onRetry={areasError?.canRetry ? handleAreasRetry : null}
+      />
+      <LoadingOverlay 
+        isVisible={actionLoading}
+        message="Processing..."
+      />
+      <LoadingOverlay 
+        isVisible={actionError && !actionLoading}
+        message={actionError?.message}
+        isError={true}
+        onRetry={actionError?.canRetry ? handleActionRetry : null}
+      />
+
+      <div className="addarea-container">
       {/* Left - Add Area */}
       <div className="addarea-left">
         <h2>Add Area</h2>
@@ -108,7 +179,8 @@ const AddArea = () => {
           onPageChange={setCurrentPage}
         />
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

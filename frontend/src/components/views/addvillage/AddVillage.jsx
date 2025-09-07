@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { API_URLS } from "../../../utils/fetchurl";
+import { useRegularApiCall } from "../../../hooks/useApiCall";
+import LoadingOverlay from "../../common/LoadingOverlay";
 import Pagination from "../../common/Pagination";
 import "../addarea/Area.css";
 
@@ -12,18 +14,33 @@ const AddVillage = () => {
   const [totalCount, setTotalCount] = useState(0);
   const villagesPerPage = 10;
 
+  // API call hooks  
+  const { loading: loadingVillages, error: villagesError, execute: executeVillagesCall, reset: resetVillagesCall } = useRegularApiCall();
+  const { loading: actionLoading, error: actionError, execute: executeActionCall, reset: resetActionCall } = useRegularApiCall();
+
   const fetchVillages = async (page = 1, searchValue = "") => {
     try {
-      const response = await axios.get(API_URLS.getAllVillages(), {
-        params: {
-          page_num: page,
-          village: searchValue || undefined,
-        },
-      });
-      setVillages(response.data.data);
-      setTotalCount(response.data.total_count);
-    } catch (error) {
-      console.error("Error fetching villages:", error);
+      await executeVillagesCall(
+        ({ signal }) => axios.get(API_URLS.getAllVillages(), {
+          params: {
+            page_num: page,
+            village: searchValue || undefined,
+          },
+          signal,
+        }),
+        {
+          loadingMessage: "Loading villages...",
+          onSuccess: (response) => {
+            setVillages(response.data.data);
+            setTotalCount(response.data.total_count);
+          },
+          onError: (error) => {
+            console.error("Error fetching villages:", error);
+          }
+        }
+      );
+    } catch (err) {
+      // Error handled by hook
     }
   };
 
@@ -34,30 +51,84 @@ const AddVillage = () => {
   const handleAddVillage = async () => {
     if (newVillage.trim()) {
       try {
-        await axios.post(API_URLS.createVillage(), {
-          village: newVillage.trim(),
-        });
-        setNewVillage("");
-        fetchVillages(currentPage, search);
-      } catch (error) {
-        alert(error.response?.data?.detail || "Error adding village.");
+        await executeActionCall(
+          ({ signal }) => axios.post(API_URLS.createVillage(), {
+            village: newVillage.trim(),
+          }, { signal }),
+          {
+            loadingMessage: "Adding village...",
+            onSuccess: () => {
+              setNewVillage("");
+              fetchVillages(currentPage, search);
+            },
+            onError: (error) => {
+              alert(error.originalError?.response?.data?.detail || "Error adding village.");
+            }
+          }
+        );
+      } catch (err) {
+        // Error handled by hook
       }
     }
   };
 
   const handleDeleteVillage = async (id) => {
-    try {
-      await axios.delete(API_URLS.deleteVillage(id));
-      fetchVillages(currentPage, search);
-    } catch (error) {
-      alert("Error deleting village.");
+    if (window.confirm("Are you sure you want to delete this village?")) {
+      try {
+        await executeActionCall(
+          ({ signal }) => axios.delete(API_URLS.deleteVillage(id), { signal }),
+          {
+            loadingMessage: "Deleting village...",
+            onSuccess: () => {
+              fetchVillages(currentPage, search);
+            },
+            onError: (error) => {
+              alert("Error deleting village.");
+            }
+          }
+        );
+      } catch (err) {
+        // Error handled by hook
+      }
     }
   };
 
   const totalPages = Math.ceil(totalCount / villagesPerPage);
 
+  // Loading and error handlers
+  const handleVillagesRetry = () => {
+    resetVillagesCall();
+    fetchVillages(currentPage, search);
+  };
+
+  const handleActionRetry = () => {
+    resetActionCall();
+  };
+
   return (
-    <div className="addarea-container">
+    <>
+      <LoadingOverlay 
+        isVisible={loadingVillages}
+        message="Loading villages..."
+      />
+      <LoadingOverlay 
+        isVisible={villagesError && !loadingVillages}
+        message={villagesError?.message}
+        isError={true}
+        onRetry={villagesError?.canRetry ? handleVillagesRetry : null}
+      />
+      <LoadingOverlay 
+        isVisible={actionLoading}
+        message="Processing..."
+      />
+      <LoadingOverlay 
+        isVisible={actionError && !actionLoading}
+        message={actionError?.message}
+        isError={true}
+        onRetry={actionError?.canRetry ? handleActionRetry : null}
+      />
+
+      <div className="addarea-container">
       {/* Left - Add Village */}
       <div className="addarea-left">
         <h2>Add Village</h2>
@@ -108,7 +179,8 @@ const AddVillage = () => {
           onPageChange={setCurrentPage}
         />
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

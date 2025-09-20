@@ -40,8 +40,8 @@ user_type_enum = ENUM(
     create_type=True
 )
 
-class User(Base):
-    __tablename__ = "user"
+class User_data(Base):
+    __tablename__ = "user_data"
 
     user_id = Column(Integer, primary_key=True, autoincrement=True)
     usercode = Column(String(50))
@@ -58,8 +58,8 @@ class User(Base):
     fk_area_id = Column(Integer, ForeignKey("area.area_id"))
     fk_village_id = Column(Integer, ForeignKey("village.village_id"))
 
-    area = relationship("Area", backref="users")
-    village = relationship("Village", backref="users")
+    area = relationship("Area", backref="user_data")
+    village = relationship("Village", backref="user_data")
 
     address = Column(String(255))
     pincode = Column(String(10))

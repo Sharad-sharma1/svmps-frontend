@@ -66,15 +66,15 @@ async def read_village(
     offset = 10 * (page_num - 1)
     
     try:
-        # Query with user count
+        # Query with user_data count
         query = db.query(
             models.Village.village_id,
             models.Village.village,
-            func.count(models.User.user_id).label("user_count")
+            func.count(models.User_data.user_id).label("user_count")
         ).outerjoin(
-            models.User,
-            (models.Village.village_id == models.User.fk_village_id) &
-            ((models.User.delete_flag == False) | (models.User.delete_flag == None))
+            models.User_data,
+            (models.Village.village_id == models.User_data.fk_village_id) &
+            ((models.User_data.delete_flag == False) | (models.User_data.delete_flag == None))
         ).group_by(
             models.Village.village_id,
             models.Village.village
@@ -155,15 +155,15 @@ async def read_area(
     
     offset = 10 * (page_num - 1)
     
-    # Query with user count
+    # Query with user_data count
     query = db.query(
         models.Area.area_id,
         models.Area.area,
-        func.count(models.User.user_id).label("user_count")
+        func.count(models.User_data.user_id).label("user_count")
     ).outerjoin(
-        models.User, 
-        (models.Area.area_id == models.User.fk_area_id) & 
-        ((models.User.delete_flag == False) | (models.User.delete_flag == None))
+        models.User_data, 
+        (models.Area.area_id == models.User_data.fk_area_id) & 
+        ((models.User_data.delete_flag == False) | (models.User_data.delete_flag == None))
     ).group_by(
         models.Area.area_id,
         models.Area.area
@@ -193,25 +193,25 @@ async def delete_area(area_id: int, db: db_dependency):
     db.delete(db_area)
     db.commit()
 
-# --- User Routes ---
-@app.post("/users/", status_code=status.HTTP_201_CREATED, response_model=UserCreate)
-def create_user(user: UserCreate, db: db_dependency):
-    if user.fk_area_id:
-        if not db.query(models.Area).filter(models.Area.area_id == user.fk_area_id).first():
+# --- User_data Routes ---
+@app.post("/user_data/", status_code=status.HTTP_201_CREATED, response_model=User_dataCreate)
+def create_user_data(user_data: User_dataCreate, db: db_dependency):
+    if user_data.fk_area_id:
+        if not db.query(models.Area).filter(models.Area.area_id == user_data.fk_area_id).first():
             raise HTTPException(status_code=400, detail="Area ID not found")
-    if user.fk_village_id:
-        if not db.query(models.Village).filter(models.Village.village_id == user.fk_village_id).first():
+    if user_data.fk_village_id:
+        if not db.query(models.Village).filter(models.Village.village_id == user_data.fk_village_id).first():
             raise HTTPException(status_code=400, detail="Village ID not found")
 
     try:
-        db_user = models.User(**user.dict())
-        db.add(db_user)
+        db_user_data = models.User_data(**user_data.dict())
+        db.add(db_user_data)
         db.commit()
-        db.refresh(db_user)
-        return db_user
+        db.refresh(db_user_data)
+        return db_user_data
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Integrity error while creating user")
+        raise HTTPException(status_code=400, detail="Integrity error while creating user_data")
 
 
 # Utility: Page number for PDF
@@ -221,8 +221,8 @@ def add_page_number(canvas, doc):
     canvas.drawString(270, 20, f"Page {doc.page}")
     canvas.restoreState()
 
-@app.get("/users/", status_code=status.HTTP_200_OK)
-def read_users(
+@app.get("/user_data/", status_code=status.HTTP_200_OK)
+def read_user_data(
     db: db_dependency,
     page_num: Optional[int] = 1,
     page_size: Optional[int] = 10,
@@ -234,45 +234,45 @@ def read_users(
     pdf: Optional[bool] = False,
     csv: Optional[bool] = False
 ):
-    query = db.query(models.User).options(joinedload(models.User.area), joinedload(models.User.village)).filter(models.User.delete_flag == False)
+    query = db.query(models.User_data).options(joinedload(models.User_data.area), joinedload(models.User_data.village)).filter(models.User_data.delete_flag == False)
 
     if name:
         search = f"%{name}%"
         query = query.filter(
             or_(
-                models.User.name.ilike(search),
-                models.User.father_or_husband_name.ilike(search),
-                models.User.mobile_no1.ilike(search),
-                models.User.mobile_no2.ilike(search)
+                models.User_data.name.ilike(search),
+                models.User_data.father_or_husband_name.ilike(search),
+                models.User_data.mobile_no1.ilike(search),
+                models.User_data.mobile_no2.ilike(search)
             )
         )
 
     if type_filter:
-        query = query.filter(models.User.type.in_([t.upper() for t in type_filter]))
+        query = query.filter(models.User_data.type.in_([t.upper() for t in type_filter]))
 
     if area_ids:
-        query = query.filter(models.User.fk_area_id.in_(area_ids))
+        query = query.filter(models.User_data.fk_area_id.in_(area_ids))
 
     if village_ids:
-        query = query.filter(models.User.fk_village_id.in_(village_ids))
+        query = query.filter(models.User_data.fk_village_id.in_(village_ids))
 
-    # Filter by specific user IDs if provided (for selected users download)
+    # Filter by specific user_data IDs if provided (for selected user_data download)
     if user_ids:
-        query = query.filter(models.User.user_id.in_(user_ids))
+        query = query.filter(models.User_data.user_id.in_(user_ids))
 
     if pdf:
-        users = (
+        user_data = (
             query
-            .join(models.Village, models.User.fk_village_id == models.Village.village_id, isouter=True)
-            .join(models.Area, models.User.fk_area_id == models.Area.area_id, isouter=True)
-            .options(joinedload(models.User.area), joinedload(models.User.village))
-            .filter(models.User.delete_flag == False)
-            .order_by(models.User.type, models.Village.village, models.User.name)
+            .join(models.Village, models.User_data.fk_village_id == models.Village.village_id, isouter=True)
+            .join(models.Area, models.User_data.fk_area_id == models.Area.area_id, isouter=True)
+            .options(joinedload(models.User_data.area), joinedload(models.User_data.village))
+            .filter(models.User_data.delete_flag == False)
+            .order_by(models.User_data.type, models.Village.village, models.User_data.name)
             .all()
         )
 
         buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, title="User Report", 
+        doc = SimpleDocTemplate(buffer, pagesize=A4, title="User_data Report", 
                               leftMargin=30, rightMargin=30, topMargin=40, bottomMargin=40)
         elements = []
 
@@ -307,11 +307,11 @@ def read_users(
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
         ])
 
-        user_groups = defaultdict(list)
-        for u in users:
-            user_groups[u.type].append(u)
+        user_data_groups = defaultdict(list)
+        for u in user_data:
+            user_data_groups[u.type].append(u)
 
-        for i, (user_type, group_users) in enumerate(user_groups.items()):
+        for i, (user_type, group_user_data) in enumerate(user_data_groups.items()):
             if i > 0:
                 elements.append(PageBreak())
 
@@ -331,7 +331,7 @@ def read_users(
 
             rows = []
             current_row = []
-            for u in group_users:
+            for u in group_user_data:
                 # Clean and concatenate name parts, avoiding extra spaces
                 name_parts = [
                     (u.name or '').strip(),
@@ -370,22 +370,22 @@ def read_users(
 
         doc.build(elements, onFirstPage=add_page_number, onLaterPages=add_page_number)
         buffer.seek(0)
-        return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=users_report.pdf"})
+        return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=user_data_report.pdf"})
 
     if csv:
-        users = (
+        user_data = (
             query
-            .join(models.Village, models.User.fk_village_id == models.Village.village_id, isouter=True)
-            .join(models.Area, models.User.fk_area_id == models.Area.area_id, isouter=True)
-            .options(joinedload(models.User.area), joinedload(models.User.village))
-            .filter(models.User.delete_flag == False)
-            .order_by(models.User.type, models.Village.village, models.User.name)
+            .join(models.Village, models.User_data.fk_village_id == models.Village.village_id, isouter=True)
+            .join(models.Area, models.User_data.fk_area_id == models.Area.area_id, isouter=True)
+            .options(joinedload(models.User_data.area), joinedload(models.User_data.village))
+            .filter(models.User_data.delete_flag == False)
+            .order_by(models.User_data.type, models.Village.village, models.User_data.name)
             .all()
         )
 
-        # Prepare data for CSV export with all columns from the show user table
+        # Prepare data for CSV export with all columns from the show user_data table
         csv_data = []
-        for u in users:
+        for u in user_data:
             # Generate user code: SMHLGN-(Type)-(VILLAGE)-(ID)
             village_name = u.village.village if u.village else 'UNKNOWN'
             user_code = f"SMHLGN-{u.type or 'UNKNOWN'}-{village_name}-{u.user_id}"
@@ -428,7 +428,7 @@ def read_users(
         return StreamingResponse(
             csv_bytes, 
             media_type="text/csv", 
-            headers={"Content-Disposition": "attachment; filename=users_report.csv"}
+            headers={"Content-Disposition": "attachment; filename=user_data_report.csv"}
         )
 
     return {
@@ -449,46 +449,46 @@ def read_users(
             "village": u.village.village if u.village else None,
             "type": u.type,
             "status": u.status,
-        } for u in query.join(models.Village, models.User.fk_village_id == models.Village.village_id, isouter=True).join(models.Area, models.User.fk_area_id == models.Area.area_id, isouter=True).order_by(models.User.type, models.Village.village, models.User.name).offset((page_num - 1) * page_size).limit(page_size).all()]
+        } for u in query.join(models.Village, models.User_data.fk_village_id == models.Village.village_id, isouter=True).join(models.Area, models.User_data.fk_area_id == models.Area.area_id, isouter=True).order_by(models.User_data.type, models.Village.village, models.User_data.name).offset((page_num - 1) * page_size).limit(page_size).all()]
     }
 
-@app.put("/users/{user_id}", response_model=UserUpdate)
-def update_user(user_id: int, updated_user: UserUpdate, db: db_dependency):
-    user = db.query(models.User).filter(models.User.user_id == user_id, models.User.delete_flag == False).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+@app.put("/user_data/{user_id}", response_model=User_dataUpdate)
+def update_user_data(user_id: int, updated_user_data: User_dataUpdate, db: db_dependency):
+    user_data = db.query(models.User_data).filter(models.User_data.user_id == user_id, models.User_data.delete_flag == False).first()
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User_data not found")
     try:
-        for key, value in updated_user.dict(exclude_unset=True).items():
-            setattr(user, key, value)
+        for key, value in updated_user_data.dict(exclude_unset=True).items():
+            setattr(user_data, key, value)
         db.commit()
-        db.refresh(user)
-        return updated_user
+        db.refresh(user_data)
+        return updated_user_data
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Integrity error while updating user")
+        raise HTTPException(status_code=400, detail="Integrity error while updating user_data")
 
-@app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: int, db: db_dependency):
-    user = db.query(models.User).filter(models.User.user_id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    user.delete_flag = True
+@app.delete("/user_data/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user_data(user_id: int, db: db_dependency):
+    user_data = db.query(models.User_data).filter(models.User_data.user_id == user_id).first()
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User_data not found")
+    user_data.delete_flag = True
     db.commit()
 
-@app.get("/users/stats", status_code=status.HTTP_200_OK)
-def get_user_stats(db: db_dependency):
+@app.get("/user_data/stats", status_code=status.HTTP_200_OK)
+def get_user_data_stats(db: db_dependency):
     from sqlalchemy import func
     
     # Get total count
-    total_count = db.query(models.User).filter(models.User.delete_flag == False).count()
+    total_count = db.query(models.User_data).filter(models.User_data.delete_flag == False).count()
     
     # Get counts by type
     type_counts = db.query(
-        models.User.type,
-        func.count(models.User.user_id).label("count")
+        models.User_data.type,
+        func.count(models.User_data.user_id).label("count")
     ).filter(
-        models.User.delete_flag == False
-    ).group_by(models.User.type).all()
+        models.User_data.delete_flag == False
+    ).group_by(models.User_data.type).all()
     
     # Convert to dictionary
     stats = {"total": total_count}

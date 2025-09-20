@@ -24,7 +24,7 @@ const Home = () => {
   const fetchStats = async () => {
     try {
       await execute(
-        ({ signal }) => axios.get(API_URLS.getUserStats(), { signal }),
+        ({ signal }) => axios.get(API_URLS.getUser_dataStats(), { signal }),
         {
           loadingMessage: "Loading dashboard statistics...",
           onSuccess: (response) => {
@@ -69,12 +69,12 @@ const Home = () => {
             <p className="card-desc">Create and Delete Village</p>
           </Link>
           <Link to="/user" className="card">
-            <h3 className="card-title">Create User</h3>
-            <p className="card-desc">Create New User</p>
+            <h3 className="card-title">Create User Data</h3>
+            <p className="card-desc">Create New User Data</p>
           </Link>
           <Link to="/showuser" className="card">
-            <h3 className="card-title">Show User</h3>
-            <p className="card-desc">Manage and Download Users</p>
+            <h3 className="card-title">Show User Data</h3>
+            <p className="card-desc">Manage and Download User Data</p>
           </Link>
           <Link to="/receipts" className="card">
             <h3 className="card-title">Receipts</h3>

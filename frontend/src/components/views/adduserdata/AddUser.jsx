@@ -4,7 +4,7 @@ import AsyncSelect from "react-select/async";
 import { API_URLS } from "../../../utils/fetchurl";
 import { useRegularApiCall } from "../../../hooks/useApiCall";
 import LoadingOverlay from "../../common/LoadingOverlay";
-import "./adduser.css";
+import "./adduserdata.css";
 
 const AddUser = () => {
   const [formData, setFormData] = useState({
@@ -61,11 +61,11 @@ const AddUser = () => {
 
     try {
       await execute(
-        ({ signal }) => axios.post(API_URLS.createUser(), cleanedData, { signal }),
+        ({ signal }) => axios.post(API_URLS.createUser_data(), cleanedData, { signal }),
         {
-          loadingMessage: "Creating user...",
+          loadingMessage: "Creating user data...",
           onSuccess: () => {
-            setMessage("✅ User created successfully!");
+            setMessage("✅ User Data created successfully!");
             setFormData({
               usercode: "",
               name: "",
@@ -104,7 +104,7 @@ const AddUser = () => {
               setErrors(fieldErrors);
             } else {
               console.error(error);
-              setMessage("❌ Error creating user");
+              setMessage("❌ Error creating user data");
             }
           }
         }
@@ -152,7 +152,7 @@ const AddUser = () => {
     <>
       <LoadingOverlay 
         isVisible={loading}
-        message="Creating user..."
+        message="Creating user data..."
       />
       <LoadingOverlay 
         isVisible={error && !loading}
@@ -162,7 +162,7 @@ const AddUser = () => {
       />
 
       <div className="form-container">
-        <h2>Create User</h2>
+        <h2>Create User Data</h2>
       <form onSubmit={handleSubmit}>
         <input name="name" value={formData.name} onChange={handleChange} placeholder="Name" required />
         <input name="surname" value={formData.surname} onChange={handleChange} placeholder="Surname" />
@@ -257,7 +257,7 @@ const AddUser = () => {
           <input name="receipt_amt" type="number" value={formData.receipt_amt} onChange={handleChange} placeholder="Amount" />
         </div> */}
 
-        <button type="submit">Create User</button>
+        <button type="submit">Create User Data</button>
         {message && <p>{message}</p>}
       </form>
       </div>

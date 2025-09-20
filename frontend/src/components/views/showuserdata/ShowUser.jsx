@@ -6,11 +6,11 @@ import { API_URLS } from "../../../utils/fetchurl";
 import { useBigDataApiCall, useRegularApiCall } from "../../../hooks/useApiCall";
 import LoadingOverlay from "../../common/LoadingOverlay";
 import Pagination from "../../common/Pagination";
-import "./Showuser.css";
+import "./showuserdata.css";
 import "./SearchButtons.css";
 
 const ShowUser = () => {
-  const [users, setUsers] = useState([]);
+  const [user_data, setUser_data] = useState([]);
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [totalCount, setTotalCount] = useState(0);
@@ -43,7 +43,7 @@ const ShowUser = () => {
             village_ids: selectedVillages.map((v) => v.value),
           };
 
-          return axios.get(API_URLS.getAllUsers(), {
+          return axios.get(API_URLS.getAllUser_data(), {
             params,
             signal,
             paramsSerializer: (params) =>
@@ -51,27 +51,27 @@ const ShowUser = () => {
           });
         },
         {
-          loadingMessage: "Loading users data... This may take up to 60 seconds for large datasets.",
+          loadingMessage: "Loading user data... This may take up to 60 seconds for large datasets.",
           onSuccess: (response) => {
-            setUsers(response.data.data);
+            setUser_data(response.data.data);
             setTotalCount(response.data.total_count);
             // Only clear selections when filters change, not on page navigation
             // setSelectedUserIds([]);  // Commented out for persistent selection
             // setSelectAll(false);     // Will be updated based on current page
           },
           onError: (error) => {
-            console.error('Failed to fetch users:', error);
+            console.error('Failed to fetch user data:', error);
           }
         }
       );
     } catch (err) {
       if (err.response && err.response.status === 404) {
-        setUsers([]);
+        setUser_data([]);
         setTotalCount(0);
         setSelectedUserIds([]);
         setSelectAll(false);
       } else {
-        console.error("❌ Failed to fetch users:", err);
+        console.error("❌ Failed to fetch user data:", err);
       }
     }
   };
@@ -90,13 +90,13 @@ const ShowUser = () => {
     });
   };
 
-  // Update select all state when users or selectedUserIds change
+  // Update select all state when user_data or selectedUserIds change
   useEffect(() => {
-    const currentPageUserIds = users.map(user => user.user_id);
+    const currentPageUserIds = user_data.map(user => user.user_id);
     const allCurrentPageSelected = currentPageUserIds.length > 0 && 
       currentPageUserIds.every(id => selectedUserIds.includes(id));
     setSelectAll(allCurrentPageSelected);
-  }, [users, selectedUserIds]);
+  }, [user_data, selectedUserIds]);
 
   // Handle select all checkbox change
   const handleSelectAllChange = () => {
@@ -106,8 +106,8 @@ const ShowUser = () => {
       setSelectAll(false);
       console.log('Selected User IDs:', []);
     } else {
-      // Select all current page users
-      const allUserIds = users.map(user => user.user_id);
+      // Select all current page user_data
+      const allUserIds = user_data.map(user => user.user_id);
       setSelectedUserIds(allUserIds);
       setSelectAll(true);
       console.log('Selected User IDs:', allUserIds);
@@ -154,11 +154,11 @@ const ShowUser = () => {
     if (window.confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
       try {
         await executeActionCall(
-          ({ signal }) => axios.delete(API_URLS.deleteUser(id), { signal }),
+          ({ signal }) => axios.delete(API_URLS.deleteUser_data(id), { signal }),
           {
-            loadingMessage: "Deleting user...",
+            loadingMessage: "Deleting user data...",
             onSuccess: () => {
-              alert("✅ User deleted successfully.");
+              alert("✅ User Data deleted successfully.");
               setShowEditPopup(false);
               setEditUser(null);
               setEditForm({});
@@ -167,8 +167,8 @@ const ShowUser = () => {
               fetchUsers(page, searchTerm);
             },
             onError: (error) => {
-              console.error("❌ Failed to delete user:", error);
-              alert("❌ Failed to delete user.");
+              console.error("❌ Failed to delete user data:", error);
+              alert("❌ Failed to delete user data.");
             }
           }
         );
@@ -244,12 +244,12 @@ const ShowUser = () => {
 
   const handleEditSubmit = async () => {
     try {
-      await executeActionCall(
-        ({ signal }) => axios.put(API_URLS.updateUser(editUser), editForm, { signal }),
+        await executeActionCall(
+          ({ signal }) => axios.put(API_URLS.updateUser_data(editUser), editForm, { signal }),
         {
-          loadingMessage: "Updating user...",
+          loadingMessage: "Updating user data...",
           onSuccess: () => {
-            alert("✅ User updated successfully.");
+            alert("✅ User Data updated successfully.");
             setEditUser(null);
             setShowEditPopup(false);
             setEditSelectedArea(null);
@@ -257,8 +257,8 @@ const ShowUser = () => {
             fetchUsers(page, searchTerm);
           },
           onError: (error) => {
-            console.error("❌ Failed to update user:", error.originalError?.response?.data || error);
-            alert("❌ Failed to update user.");
+            console.error("❌ Failed to update user data:", error.originalError?.response?.data || error);
+            alert("❌ Failed to update user data.");
           }
         }
       );
@@ -288,7 +288,7 @@ const ShowUser = () => {
       console.log('📄 PDF Download - Selected Users:', selectedUserIds);
       console.log('📄 PDF Download - Params:', params);
 
-      const response = await axios.get(API_URLS.getAllUsers(), {
+      const response = await axios.get(API_URLS.getAllUser_data(), {
         params,
         paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
         responseType: 'blob',
@@ -311,7 +311,7 @@ const ShowUser = () => {
         pdf: true,
       };
 
-      const response = await axios.get(API_URLS.getAllUsers(), {
+      const response = await axios.get(API_URLS.getAllUser_data(), {
         params,
         paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
         responseType: 'blob',
@@ -344,7 +344,7 @@ const ShowUser = () => {
         console.log('📊 CSV Download - Selected Users:', selectedUserIds);
         console.log('📊 CSV Download - Params:', params);
 
-        const response = await axios.get(API_URLS.getAllUsers(), {
+        const response = await axios.get(API_URLS.getAllUser_data(), {
           params,
           paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
           responseType: 'blob',
@@ -367,7 +367,7 @@ const ShowUser = () => {
           csv: true,
         };
 
-        const response = await axios.get(API_URLS.getAllUsers(), {
+        const response = await axios.get(API_URLS.getAllUser_data(), {
           params,
           paramsSerializer: (params) => qs.stringify(params, { arrayFormat: "repeat" }),
           responseType: 'blob',
@@ -434,7 +434,7 @@ const ShowUser = () => {
     <>
       <LoadingOverlay 
         isVisible={usersLoading}
-        message="Loading users data... This may take up to 60 seconds for large datasets."
+        message="Loading user data... This may take up to 60 seconds for large datasets."
       />
       <LoadingOverlay 
         isVisible={usersError && !usersLoading}
@@ -454,14 +454,14 @@ const ShowUser = () => {
       />
 
       <div className="show-user-container">
-        <h2>Show User</h2>
+        <h2>Show User Data</h2>
         
         {/* Row 1: Search input + Action buttons + Download buttons */}
         <div className="filter-row compact-row row-one">
           <input
             type="text"
             className="search-input mini"
-            placeholder="Search users..."
+            placeholder="Search user data..."
             value={searchTerm}
             onChange={handleSearchChange}
             onKeyDown={(e) => {
@@ -588,8 +588,8 @@ const ShowUser = () => {
             </tr>
           </thead>
           <tbody>
-            {users.length ? (
-              users.map((user) => (
+            {user_data.length ? (
+              user_data.map((user) => (
                 <tr key={user.user_id}>
                   <td>
                     <input
@@ -625,7 +625,7 @@ const ShowUser = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="22" className="no-data">No users found</td>
+                <td colSpan="22" className="no-data">No user data found</td>
               </tr>
             )}
           </tbody>
@@ -662,7 +662,7 @@ const ShowUser = () => {
           Total Records: {totalCount}
           {selectedUserIds.length > 0 && (
             <span className="selected-count">
-              | Selected: {selectedUserIds.length} users
+              | Selected: {selectedUserIds.length} user data records
               <button 
                 className="clear-selection-btn"
                 onClick={() => {
@@ -683,7 +683,7 @@ const ShowUser = () => {
         <div className="popup-overlay">
           <div className="popup-container">
             <div className="popup-header">
-              <h2>Edit User</h2>
+              <h2>Edit User Data</h2>
               <button className="close-btn" onClick={handleCloseEditPopup}>×</button>
             </div>
             {console.log("EditForm data:", editForm)} {/* Debug log */}
@@ -850,8 +850,8 @@ const ShowUser = () => {
               </select>
 
               <div className="popup-buttons">
-                <button type="submit" className="save-btn">Update User</button>
-                <button type="button" className="delete-btn" onClick={() => handleDelete(editUser)}>Delete User</button>
+                <button type="submit" className="save-btn">Update User Data</button>
+                <button type="button" className="delete-btn" onClick={() => handleDelete(editUser)}>Delete User Data</button>
                 <button type="button" className="cancel-btn" onClick={handleCloseEditPopup}>Cancel</button>
               </div>
             </form>

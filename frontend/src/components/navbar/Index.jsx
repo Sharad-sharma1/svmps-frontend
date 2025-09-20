@@ -38,8 +38,8 @@ const Navbar = () => {
         <Link to="/home" className="sidebar-link" onClick={closeSidebar}>Home</Link>
         <Link to="/area" className="sidebar-link" onClick={closeSidebar}>Area</Link>
         <Link to="/village" className="sidebar-link" onClick={closeSidebar}>Village</Link>
-        <Link to="/user" className="sidebar-link" onClick={closeSidebar}>User</Link>
-        <Link to="/showuser" className="sidebar-link" onClick={closeSidebar}>Show User</Link>
+        <Link to="/user" className="sidebar-link" onClick={closeSidebar}>User Data</Link>
+        <Link to="/showuser" className="sidebar-link" onClick={closeSidebar}>Show User Data</Link>
         <Link to="/receipts" className="sidebar-link" onClick={closeSidebar}>Receipts</Link>
         <Link to="/" className="login-button">Log Out</Link>
       </div>

@@ -43,12 +43,12 @@ const getBaseUrl = () => {
 // Simple API URLs
 export const API_URLS = {
   // Users
-  getAllUsers: () => `${getBaseUrl()}/users/`,
-  getUserById: (id) => `${getBaseUrl()}/users/${id}`,
-  createUser: () => `${getBaseUrl()}/users/`,
-  updateUser: (id) => `${getBaseUrl()}/users/${id}`,
-  deleteUser: (id) => `${getBaseUrl()}/users/${id}`,
-  getUserStats: () => `${getBaseUrl()}/users/stats`,
+  getAllUser_data: () => `${getBaseUrl()}/user_data/`,
+  getUser_dataById: (id) => `${getBaseUrl()}/user_data/${id}`,
+  createUser_data: () => `${getBaseUrl()}/user_data/`,
+  updateUser_data: (id) => `${getBaseUrl()}/user_data/${id}`,
+  deleteUser_data: (id) => `${getBaseUrl()}/user_data/${id}`,
+  getUser_dataStats: () => `${getBaseUrl()}/user_data/stats`,
   
   // Areas
   getAllAreas: () => `${getBaseUrl()}/area/`,

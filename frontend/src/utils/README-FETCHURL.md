@@ -44,7 +44,7 @@ import { API_URLS } from "../../../utils/fetchurl";
 
 ```jsx
 // Instead of hardcoded URLs
-// await axios.get("https://svmps-frontend.onrender.com/users/");
+// await axios.get("https://svmps-frontend.onrender.com/user_data/");
 
 // Use centralized URLs
 await axios.get(API_URLS.getAllUsers());
@@ -56,11 +56,11 @@ await axios.delete(API_URLS.deleteUser(userId));
 ## Available API URLs
 
 ### Users
-- `API_URLS.getAllUsers()` - GET /users/
-- `API_URLS.getUserById(id)` - GET /users/{id}
-- `API_URLS.createUser()` - POST /users/
-- `API_URLS.updateUser(id)` - PUT /users/{id}
-- `API_URLS.deleteUser(id)` - DELETE /users/{id}
+- `API_URLS.getAllUser_data()` - GET /user_data/
+- `API_URLS.getUser_dataById(id)` - GET /user_data/{id}
+- `API_URLS.createUser_data()` - POST /user_data/
+- `API_URLS.updateUser_data(id)` - PUT /user_data/{id}
+- `API_URLS.deleteUser_data(id)` - DELETE /user_data/{id}
 
 ### Areas
 - `API_URLS.getAllAreas()` - GET /area/

@@ -4,9 +4,9 @@ import Addarea from '../views/addarea/AddArea'
 import Addvillage from '../views/addvillage/AddVillage'
 import Navbar from '../navbar/Index'
 import Login from '../login/Login'
-import Showuser from '../views/showuser/ShowUser'
+import Showuser from '../views/showuserdata/ShowUser'
 import Printuser from '../views/printdata/PrintData'
-import Adduser from '../views/adduser/AddUser'
+import Adduser from '../views/adduserdata/AddUser'
 import CreateReceipt from '../views/createreceipt/CreateReceipt'
 
 const router = createHashRouter(

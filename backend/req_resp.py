@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import date
 
 
-class UserCreate(BaseModel):
+class User_dataCreate(BaseModel):
     usercode: Optional[str]
     name: str
     surname: Optional[str]
@@ -34,7 +34,7 @@ class UserCreate(BaseModel):
     receipt_date: Optional[date]
     receipt_amt: Optional[float]
 
-class UserUpdate(BaseModel):
+class User_dataUpdate(BaseModel):
     usercode: Optional[str] = None
     name: Optional[str] = None
     surname: Optional[str] = None

@@ -74,6 +74,13 @@ const router = createHashRouter(
         <div>
           <Login />
         </div>
+    },
+    {
+      path: "*",
+      element:
+        <div>
+          <Login />
+        </div>
     }
   ]
 )

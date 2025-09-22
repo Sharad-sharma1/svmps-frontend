@@ -1,11 +1,18 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import './NotAuthenticatedPopup.css';
 
 const NotAuthenticatedPopup = () => {
+  const navigate = useNavigate();
+
   const handleLoginClick = () => {
     // Force navigation to login page and clear any cached data
-    // Use the correct base path for GitHub Pages deployment
-    window.location.href = '/svmps-frontend/';
+    // Use React Router navigation for better compatibility with hash routing
+    navigate('/');
+    // Fallback to window.location if navigate doesn't work
+    setTimeout(() => {
+      window.location.href = '/svmps-frontend/';
+    }, 100);
   };
 
   return (

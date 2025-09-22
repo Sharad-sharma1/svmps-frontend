@@ -1,42 +1,70 @@
-// 100% .env dependent API URL management - NO FALLBACKS!
+// Smart environment detection with fallbacks for GitHub Pages deployment
 
-// Validate and get base URL - STRICT MODE
+// Validate and get base URL - SMART MODE with fallbacks
 const getBaseUrl = () => {
   // DEBUG: Log all environment variables
   console.log('🔍 DEBUG - All Vite env vars:', import.meta.env);
   console.log('🔍 DEBUG - VITE_NODE_ENV:', import.meta.env.VITE_NODE_ENV);
   console.log('🔍 DEBUG - VITE_DEV_API_URL:', import.meta.env.VITE_DEV_API_URL);
   console.log('🔍 DEBUG - VITE_PROD_API_URL:', import.meta.env.VITE_PROD_API_URL);
+  console.log('🔍 DEBUG - window.location.hostname:', window.location.hostname);
   
   const nodeEnv = import.meta.env.VITE_NODE_ENV;
   const devUrl = import.meta.env.VITE_DEV_API_URL;
   const prodUrl = import.meta.env.VITE_PROD_API_URL;
+  const hostname = window.location.hostname;
   
-  // STRICT VALIDATION - No fallbacks allowed
-  if (!nodeEnv) {
-    throw new Error('❌ MISSING: VITE_NODE_ENV is required in .env file!');
+  // Auto-detect environment based on hostname if env vars not available
+  const isGitHubPages = hostname.includes('github.io');
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  
+  let detectedEnv = nodeEnv;
+  if (!detectedEnv) {
+    detectedEnv = isLocalhost ? 'development' : 'production';
+    console.log(`🔍 AUTO-DETECTED Environment: ${detectedEnv} (based on hostname: ${hostname})`);
   }
   
-  if (nodeEnv !== 'development' && nodeEnv !== 'production') {
-    throw new Error(`❌ INVALID: VITE_NODE_ENV must be 'development' or 'production', got: '${nodeEnv}'`);
+  // Development environment
+  if (detectedEnv === 'development') {
+    const apiUrl = devUrl || 'http://localhost:8000';
+    console.log('✅ Environment: development');
+    console.log('✅ API URL:', apiUrl);
+    return apiUrl;
   }
   
-  if (nodeEnv === 'development') {
-    if (!devUrl) {
-      throw new Error('❌ MISSING: VITE_DEV_API_URL is required when VITE_NODE_ENV=development');
-    }
-    console.log('✅ 1. Environment: development');
-    console.log('✅ 2. API URL:', devUrl);
-    return devUrl;
+  // Production environment
+  if (detectedEnv === 'production') {
+    const apiUrl = prodUrl || 'https://svmps-frontend.onrender.com';
+    console.log('✅ Environment: production');
+    console.log('✅ API URL:', apiUrl);
+    return apiUrl;
   }
   
-  if (nodeEnv === 'production') {
-    if (!prodUrl) {
-      throw new Error('❌ MISSING: VITE_PROD_API_URL is required when VITE_NODE_ENV=production');
-    }
-    console.log('✅ 3. Environment: production');
-    console.log('✅ 4. API URL:', prodUrl);
-    return prodUrl;
+  // Fallback error
+  throw new Error(`❌ INVALID: Environment must be 'development' or 'production', got: '${detectedEnv}'`);
+};
+
+// Environment information for debugging
+export const ENV_INFO = {
+  get current() {
+    const hostname = window.location.hostname;
+    const nodeEnv = import.meta.env.VITE_NODE_ENV;
+    return nodeEnv || (hostname === 'localhost' || hostname === '127.0.0.1' ? 'development' : 'production');
+  },
+  get baseUrl() {
+    return getBaseUrl();
+  },
+  get hostname() {
+    return window.location.hostname;
+  },
+  isDevelopment() {
+    return this.current === 'development';
+  },
+  isProduction() {
+    return this.current === 'production';
+  },
+  isGitHubPages() {
+    return window.location.hostname.includes('github.io');
   }
 };
 

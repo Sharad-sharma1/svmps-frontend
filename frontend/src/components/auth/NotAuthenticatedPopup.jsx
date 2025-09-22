@@ -4,7 +4,8 @@ import './NotAuthenticatedPopup.css';
 const NotAuthenticatedPopup = () => {
   const handleLoginClick = () => {
     // Force navigation to login page and clear any cached data
-    window.location.href = '/';
+    // Use the correct base path for GitHub Pages deployment
+    window.location.href = '/svmps-frontend/';
   };
 
   return (

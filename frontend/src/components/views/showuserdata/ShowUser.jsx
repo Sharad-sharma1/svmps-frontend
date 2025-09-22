@@ -4,7 +4,8 @@ import qs from "qs";
 import AsyncSelect from "react-select/async";
 import { API_URLS } from "../../../utils/fetchurl";
 import { useBigDataApiCall, useRegularApiCall } from "../../../hooks/useApiCall";
-import LoadingOverlay from "../../common/LoadingOverlay";
+import { useAuth } from "../../../contexts/AuthContext";
+import StatusOverlay from "../../common/StatusOverlay";
 import Pagination from "../../common/Pagination";
 import "./showuserdata.css";
 import "./SearchButtons.css";
@@ -26,9 +27,19 @@ const ShowUser = () => {
   const [selectAll, setSelectAll] = useState(false);
   const [pageSize, setPageSize] = useState(10);
 
+  // Enhanced popup state for StatusOverlay
+  const [overlayState, setOverlayState] = useState({
+    isVisible: false,
+    message: "",
+    isError: false,
+    errorType: "general",
+    pendingAction: null // for delete confirmations
+  });
+
   // API call hooks
   const { loading: usersLoading, error: usersError, execute: executeUsersCall, reset: resetUsersCall } = useBigDataApiCall();
   const { loading: actionLoading, error: actionError, execute: executeActionCall, reset: resetActionCall } = useRegularApiCall();
+  const { isAuthenticated, logout } = useAuth(); // Add auth context
 
   const fetchUsers = async (pageNum = 1, search = "") => {
     try {
@@ -150,32 +161,73 @@ const ShowUser = () => {
     setSelectAll(false);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
-      try {
-        await executeActionCall(
-          ({ signal }) => axios.delete(API_URLS.deleteUser_data(id), { signal }),
-          {
-            loadingMessage: "Deleting user data...",
-            onSuccess: () => {
-              alert("✅ User Data deleted successfully.");
-              setShowEditPopup(false);
-              setEditUser(null);
-              setEditForm({});
-              setEditSelectedArea(null);
-              setEditSelectedVillage(null);
-              fetchUsers(page, searchTerm);
-            },
-            onError: (error) => {
+  const handleDelete = (id) => {
+    setOverlayState({
+      isVisible: true,
+      message: "Are you sure you want to delete this user? This action cannot be undone.",
+      isError: true, // Treat as error for confirmation styling
+      errorType: "general",
+      pendingAction: { type: 'delete', id }
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    const { pendingAction } = overlayState;
+    if (!pendingAction || pendingAction.type !== 'delete') return;
+
+    setOverlayState({ ...overlayState, isVisible: false }); // Close confirm
+
+    try {
+      await executeActionCall(
+        ({ signal }) => axios.delete(API_URLS.deleteUser_data(pendingAction.id), { signal }),
+        {
+          loadingMessage: "Deleting user data...",
+          onSuccess: () => {
+            setShowEditPopup(false);
+            setEditUser(null);
+            setEditForm({});
+            setEditSelectedArea(null);
+            setEditSelectedVillage(null);
+            fetchUsers(page, searchTerm);
+            setOverlayState({
+              isVisible: true,
+              message: "User data deleted successfully.",
+              isError: false,
+              errorType: "general",
+              pendingAction: null
+            });
+          },
+          onError: (error) => {
+            const status = error.originalError?.response?.status;
+            if (status === 401) {
+              // Reset API error state to prevent double popups
+              resetActionCall();
+              setOverlayState({
+                isVisible: true,
+                message: "You are not authorized to delete user data. Please login with proper credentials.",
+                isError: true,
+                errorType: "unauthorized",
+                pendingAction: null
+              });
+            } else {
               console.error("❌ Failed to delete user data:", error);
-              alert("❌ Failed to delete user data.");
+              // Reset API error state to prevent double popups
+              resetActionCall();
+              setOverlayState({
+                isVisible: true,
+                message: "Failed to delete user data. Please try again.",
+                isError: true,
+                errorType: "general",
+                pendingAction: null
+              });
             }
           }
-        );
-      } catch (err) {
-        // Error handled by hook
-      }
+        }
+      );
+    } catch (err) {
+      // Error handled by hook
     }
+    setOverlayState(prev => ({ ...prev, pendingAction: null })); // Clear pending action
   };
 
   const handleEditClick = (user) => {
@@ -249,16 +301,43 @@ const ShowUser = () => {
         {
           loadingMessage: "Updating user data...",
           onSuccess: () => {
-            alert("✅ User Data updated successfully.");
             setEditUser(null);
             setShowEditPopup(false);
             setEditSelectedArea(null);
             setEditSelectedVillage(null);
             fetchUsers(page, searchTerm);
+            setOverlayState({
+              isVisible: true,
+              message: "User data updated successfully.",
+              isError: false,
+              errorType: "general",
+              pendingAction: null
+            });
           },
           onError: (error) => {
-            console.error("❌ Failed to update user data:", error.originalError?.response?.data || error);
-            alert("❌ Failed to update user data.");
+            const status = error.originalError?.response?.status;
+            if (status === 401) {
+              // Reset API error state to prevent double popups
+              resetActionCall();
+              setOverlayState({
+                isVisible: true,
+                message: "You are not authorized to update user data. Please login with proper credentials.",
+                isError: true,
+                errorType: "unauthorized",
+                pendingAction: null
+              });
+            } else {
+              console.error("❌ Failed to update user data:", error.originalError?.response?.data || error);
+              // Reset API error state to prevent double popups
+              resetActionCall();
+              setOverlayState({
+                isVisible: true,
+                message: "Failed to update user data. Please try again.",
+                isError: true,
+                errorType: "general",
+                pendingAction: null
+              });
+            }
           }
         }
       );
@@ -325,9 +404,17 @@ const ShowUser = () => {
       link.click();
       document.body.removeChild(link);
     }
-  } catch (error) {
+    } catch (error) {
     console.error("❌ Failed to download PDF:", error);
-    alert("❌ Error downloading PDF.");
+    // Reset any existing error states
+    resetActionCall();
+    setOverlayState({
+      isVisible: true,
+      message: "Error downloading PDF. Please try again.",
+      isError: true,
+      errorType: "general",
+      pendingAction: null
+    });
   }
 };
 
@@ -383,7 +470,15 @@ const ShowUser = () => {
       }
     } catch (error) {
       console.error("❌ Failed to download Excel:", error);
-      alert("❌ Error downloading Excel.");
+      // Reset any existing error states
+      resetActionCall();
+      setOverlayState({
+        isVisible: true,
+        message: "Error downloading Excel file. Please try again.",
+        isError: true,
+        errorType: "general",
+        pendingAction: null
+      });
     }
   };
 
@@ -430,28 +525,19 @@ const ShowUser = () => {
     resetActionCall();
   };
 
+  const getOverlayProps = () => {
+    if (overlayState.isVisible) return overlayState;
+    if (actionLoading) return { isVisible: true, message: "Processing...", isError: false, errorType: "general" };
+    if (actionError && !actionLoading) return { isVisible: true, message: actionError?.message || "Operation failed", isError: true, errorType: "general" };
+    if (usersLoading) return { isVisible: true, message: "Loading user data... This may take up to 60 seconds for large datasets.", isError: false, errorType: "general" };
+    if (usersError && !usersLoading) return { isVisible: true, message: usersError?.message || "Failed to load users", isError: true, errorType: "general" };
+    return { isVisible: false };
+  };
+
+  const currentOverlay = getOverlayProps();
+
   return (
     <>
-      <LoadingOverlay 
-        isVisible={usersLoading}
-        message="Loading user data... This may take up to 60 seconds for large datasets."
-      />
-      <LoadingOverlay 
-        isVisible={usersError && !usersLoading}
-        message={usersError?.message}
-        isError={true}
-        onRetry={usersError?.canRetry ? handleUsersRetry : null}
-      />
-      <LoadingOverlay 
-        isVisible={actionLoading}
-        message="Processing..."
-      />
-      <LoadingOverlay 
-        isVisible={actionError && !actionLoading}
-        message={actionError?.message}
-        isError={true}
-        onRetry={actionError?.canRetry ? handleActionRetry : null}
-      />
 
       <div className="show-user-container">
         <h2>Show User Data</h2>
@@ -859,6 +945,29 @@ const ShowUser = () => {
         </div>
       )}
       </div>
+
+      {/* Single unified StatusOverlay for all states */}
+      <StatusOverlay
+        isVisible={currentOverlay.isVisible}
+        message={currentOverlay.message}
+        isError={currentOverlay.isError}
+        errorType={currentOverlay.errorType}
+        onRetry={
+          currentOverlay.pendingAction?.type === 'delete' ? handleConfirmDelete :
+          usersError?.canRetry ? handleUsersRetry :
+          actionError?.canRetry ? handleActionRetry :
+          null
+        }
+        onClose={() => {
+          if (overlayState.isVisible) {
+            setOverlayState({ ...overlayState, isVisible: false });
+          } else {
+            resetUsersCall();
+            resetActionCall();
+          }
+        }}
+        onLoginAgain={currentOverlay.errorType === 'unauthorized' || currentOverlay.errorType === 'auth' ? logout : null}
+      />
     </>
   );
 };

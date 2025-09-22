@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import './Index.css';
 
 const Navbar = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { logout, user } = useAuth();
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -11,6 +13,11 @@ const Navbar = () => {
 
   const closeSidebar = () => {
     setSidebarOpen(false);
+  };
+
+  const handleLogout = () => {
+    closeSidebar();
+    logout();
   };
 
   return (
@@ -38,10 +45,12 @@ const Navbar = () => {
         <Link to="/home" className="sidebar-link" onClick={closeSidebar}>Home</Link>
         <Link to="/area" className="sidebar-link" onClick={closeSidebar}>Area</Link>
         <Link to="/village" className="sidebar-link" onClick={closeSidebar}>Village</Link>
-        <Link to="/user" className="sidebar-link" onClick={closeSidebar}>User Data</Link>
+        <Link to="/user" className="sidebar-link" onClick={closeSidebar}>Create User Data</Link>
         <Link to="/showuser" className="sidebar-link" onClick={closeSidebar}>Show User Data</Link>
         <Link to="/receipts" className="sidebar-link" onClick={closeSidebar}>Receipts</Link>
-        <Link to="/" className="login-button">Log Out</Link>
+        <button className="login-button" onClick={handleLogout}>
+          Log Out {user?.username ? `(${user.username})` : ''}
+        </button>
       </div>
       
       

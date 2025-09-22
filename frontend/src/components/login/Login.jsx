@@ -1,22 +1,73 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import './Login.css';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [userid, setUserid] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const navigate = useNavigate(); // Hook for navigation
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { login } = useAuth(); // Get login function from auth context
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Logging in with:', { email, password });
+    setIsLoading(true);
+    setError('');
+    
+    console.log('Logging in with:', { userid, password });
 
-    if (email === 'admin@abc.com' && password === 'admin12345') {
-      console.log('Login successful');
-      navigate('/home'); // 👈 Navigates to /home (change if needed)
-    } else {
-      setError('Invalid email or password');
+    try {
+      // Make API call to backend login endpoint
+      // Backend expects OAuth2PasswordRequestForm (form data), not JSON
+      const formData = new URLSearchParams();
+      formData.append('username', userid);
+      formData.append('password', password);
+      
+      const response = await fetch('http://localhost:8000/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      console.log('API Response:', { status: response.status, data }); // Debug log
+
+      if (response.ok && data.access_token) {
+        console.log('Login successful');
+        
+        // Use auth context to store authentication data
+        login(data);
+        
+        // Navigate to home page
+        navigate('/home');
+      } else {
+        // Handle API error response
+        let errorMessage = 'Invalid userid or password';
+        
+        if (data.detail) {
+          // Handle FastAPI validation errors
+          if (Array.isArray(data.detail)) {
+            errorMessage = data.detail.map(err => err.msg || err).join(', ');
+          } else if (typeof data.detail === 'string') {
+            errorMessage = data.detail;
+          } else {
+            errorMessage = JSON.stringify(data.detail);
+          }
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+        
+        setError(errorMessage);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Network error. Please check your connection and try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -25,12 +76,12 @@ const Login = () => {
       <div className="login-card">
         <h2 className="login-title">Login</h2>
         <form onSubmit={handleSubmit} className="login-form">
-          <label>Email</label>
+          <label>User ID</label>
           <input
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            placeholder="Enter your userid"
+            value={userid}
+            onChange={(e) => setUserid(e.target.value)}
             required
           />
 
@@ -50,7 +101,9 @@ const Login = () => {
             <a href="#">Forgot Password?</a>
           </div>
 
-          <button type="submit" className="login-button">Sign In</button>
+          <button type="submit" className="login-button" disabled={isLoading}>
+            {isLoading ? 'Signing In...' : 'Sign In'}
+          </button>
         </form>
       </div>
     </div>

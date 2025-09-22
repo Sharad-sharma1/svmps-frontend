@@ -1,8 +1,13 @@
 import './App.css';
 import Routerall from './components/routes/Route';
+import { AuthProvider } from './contexts/AuthContext';
 
 function App() {
-  return <Routerall />; // Render the full routing setup
+  return (
+    <AuthProvider>
+      <Routerall />
+    </AuthProvider>
+  );
 }
 
 export default App;

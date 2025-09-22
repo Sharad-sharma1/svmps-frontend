@@ -10,15 +10,22 @@ from sqlalchemy.orm import Session
 from database import get_db
 from api_request_response.user_data import User_dataCreate, User_dataUpdate
 from controller import user_data as user_data_controller
+from login.dependencies import require_user_data_viewer, require_user_data_editor
+from models.auth import User
 
 router = APIRouter()
 db_dependency = Annotated[Session, Depends(get_db)]
 
 
 @router.post("/user_data/", status_code=status.HTTP_201_CREATED)
-def create_user_data(user_data: User_dataCreate, db: db_dependency):
+def create_user_data(
+    user_data: User_dataCreate, 
+    db: db_dependency,
+    current_user: User = Depends(require_user_data_editor)
+):
     """
     API to create a new user data record.
+    Requires: user_data_editor or admin role
     """
     try:
         response = user_data_controller.create_user_data_controller(user_data, db)
@@ -38,10 +45,12 @@ def read_user_data(
     village_ids: Optional[List[int]] = Query(None),
     user_ids: Optional[List[int]] = Query(None),
     pdf: Optional[bool] = False,
-    csv: Optional[bool] = False
+    csv: Optional[bool] = False,
+    current_user: User = Depends(require_user_data_viewer)
 ):
     """
     API to get user data records with filtering and pagination.
+    Requires: user_data_viewer, user_data_editor, or admin role
     """
     try:
         response = user_data_controller.get_user_data_controller(
@@ -53,9 +62,15 @@ def read_user_data(
 
 
 @router.put("/user_data/{user_id}", status_code=status.HTTP_200_OK)
-def update_user_data(user_id: int, updated_user_data: User_dataUpdate, db: db_dependency):
+def update_user_data(
+    user_id: int, 
+    updated_user_data: User_dataUpdate, 
+    db: db_dependency,
+    current_user: User = Depends(require_user_data_editor)
+):
     """
     API to update a user data record.
+    Requires: user_data_editor or admin role
     """
     try:
         response = user_data_controller.update_user_data_controller(user_id, updated_user_data, db)
@@ -65,9 +80,14 @@ def update_user_data(user_id: int, updated_user_data: User_dataUpdate, db: db_de
 
 
 @router.delete("/user_data/{user_id}", status_code=status.HTTP_200_OK)
-def delete_user_data(user_id: int, db: db_dependency):
+def delete_user_data(
+    user_id: int, 
+    db: db_dependency,
+    current_user: User = Depends(require_user_data_editor)
+):
     """
     API to soft delete a user data record.
+    Requires: user_data_editor or admin role
     """
     try:
         response = user_data_controller.delete_user_data_controller(user_id, db)
@@ -77,9 +97,13 @@ def delete_user_data(user_id: int, db: db_dependency):
 
 
 @router.get("/user_data/stats", status_code=status.HTTP_200_OK)
-def get_user_data_stats(db: db_dependency):
+def get_user_data_stats(
+    db: db_dependency,
+    current_user: User = Depends(require_user_data_viewer)
+):
     """
     API to get user data statistics.
+    Requires: user_data_viewer, user_data_editor, or admin role
     """
     try:
         response = user_data_controller.get_user_data_stats_controller(db)

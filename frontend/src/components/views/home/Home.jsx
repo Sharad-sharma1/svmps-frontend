@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { API_URLS } from '../../../utils/fetchurl';
 import { useRegularApiCall } from '../../../hooks/useApiCall';
-import LoadingOverlay from '../../common/LoadingOverlay';
+import { useAuth } from '../../../contexts/AuthContext';
+import StatusOverlay from '../../common/StatusOverlay';
 import './Home.css';
 
 const Home = () => {
@@ -15,11 +16,18 @@ const Home = () => {
     siddhpur: 0
   });
 
+  const [authError, setAuthError] = useState(null);
+  const [showAuthErrorOverlay, setShowAuthErrorOverlay] = useState(false);
+
   const { loading, error, execute, reset } = useRegularApiCall();
+  const { isAuthenticated, loading: authLoading } = useAuth(); // Add auth context
 
   useEffect(() => {
-    fetchStats();
-  }, []);
+    // Only fetch stats when authenticated and auth is not loading
+    if (isAuthenticated && !authLoading) {
+      fetchStats();
+    }
+  }, [isAuthenticated, authLoading]);
 
   const fetchStats = async () => {
     try {
@@ -28,15 +36,46 @@ const Home = () => {
         {
           loadingMessage: "Loading dashboard statistics...",
           onSuccess: (response) => {
-            setStats(response.data);
+            console.log('✅ Home: Stats fetched successfully');
+            // Backend returns { status, message, data: {...actual stats...} }
+            setStats(response.data.data || response.data);
+            setAuthError(null);
+            setShowAuthErrorOverlay(false);
           },
           onError: (error) => {
-            console.error('Failed to fetch user statistics:', error);
+            console.error('❌ Home: Failed to fetch user statistics:', error);
+            // Just log the error here, handle auth errors in catch block only
           }
         }
       );
     } catch (err) {
-      // Error is already handled by useApiCall hook
+      // Handle auth errors only here to avoid duplication
+      const status = err.originalError?.response?.status;
+      if (status === 401 || status === 403) {
+        console.log('📊 Home: User does not have access to stats API - showing default values');
+        
+        // Clear any existing error states first
+        reset();
+        
+        // Set default stats to 0
+        setStats({
+          total: 0,
+          all: 0,
+          nrs: 0,
+          commitee: 0,
+          siddhpur: 0
+        });
+        
+        // Show authorization error overlay
+        setAuthError({
+          message: "You don't have permission to view statistics. You can still access other features.",
+          type: 'unauthorized'
+        });
+        setShowAuthErrorOverlay(true);
+      } else {
+        console.error('📊 Home: Non-auth error in catch block:', err);
+        // Let the error remain for general error overlay to handle
+      }
     }
   };
 
@@ -45,17 +84,36 @@ const Home = () => {
     fetchStats();
   };
 
+  const handleAuthErrorClose = () => {
+    setShowAuthErrorOverlay(false);
+    setAuthError(null);
+    // Also reset any general error to ensure clean state
+    reset();
+  };
+
   return (
     <>
-      <LoadingOverlay 
+      <StatusOverlay 
         isVisible={loading}
         message="Loading dashboard statistics..."
       />
-      <LoadingOverlay 
-        isVisible={error && !loading}
-        message={error?.message}
+      {/* General error overlay - only show if not loading and no auth error */}
+      {!showAuthErrorOverlay && !authError && (
+        <StatusOverlay 
+          isVisible={error && !loading}
+          message={error?.message}
+          isError={true}
+          onRetry={error?.canRetry ? handleRetry : null}
+        />
+      )}
+      
+      {/* Authorization error overlay - takes priority over general errors */}
+      <StatusOverlay 
+        isVisible={showAuthErrorOverlay && authError}
+        message={authError?.message}
         isError={true}
-        onRetry={error?.canRetry ? handleRetry : null}
+        errorType="unauthorized"
+        onClose={handleAuthErrorClose}
       />
       
       <div className="home-container">

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { API_URLS } from "../../../utils/fetchurl";
 import { useRegularApiCall } from "../../../hooks/useApiCall";
-import LoadingOverlay from "../../common/LoadingOverlay";
+import { useAuth } from "../../../contexts/AuthContext";
+import StatusOverlay from "../../common/StatusOverlay";
 import Pagination from "../../common/Pagination";
 import "./Area.css";
 
@@ -14,9 +15,19 @@ const AddArea = () => {
   const [totalCount, setTotalCount] = useState(0);
   const areasPerPage = 10;
 
+  // Enhanced popup state for StatusOverlay
+  const [overlayState, setOverlayState] = useState({
+    isVisible: false,
+    message: "",
+    isError: false,
+    errorType: "general",
+    pendingAction: null // for delete confirmations
+  });
+
   // API call hooks
   const { loading: loadingAreas, error: areasError, execute: executeAreasCall, reset: resetAreasCall } = useRegularApiCall();
   const { loading: actionLoading, error: actionError, execute: executeActionCall, reset: resetActionCall } = useRegularApiCall();
+  const { isAuthenticated, logout } = useAuth(); // Add auth context
 
   const fetchAreas = async (page = 1, searchValue = "") => {
     try {
@@ -62,7 +73,24 @@ const AddArea = () => {
               fetchAreas(currentPage, search);
             },
             onError: (error) => {
-              alert(error.originalError?.response?.data?.detail || "Error adding area.");
+              const status = error.originalError?.response?.status;
+              if (status === 401) {
+                setOverlayState({
+                  isVisible: true,
+                  message: "You are not authorized to add areas. Please login with proper credentials.",
+                  isError: true,
+                  errorType: "unauthorized",
+                  pendingAction: null
+                });
+              } else {
+                setOverlayState({
+                  isVisible: true,
+                  message: error.originalError?.response?.data?.detail || "Error adding area. Please try again.",
+                  isError: true,
+                  errorType: "general",
+                  pendingAction: null
+                });
+              }
             }
           }
         );
@@ -72,24 +100,62 @@ const AddArea = () => {
     }
   };
 
-  const handleDeleteArea = async (id) => {
-    if (window.confirm("Are you sure you want to delete this area?")) {
-      try {
-        await executeActionCall(
-          ({ signal }) => axios.delete(API_URLS.deleteArea(id), { signal }),
-          {
-            loadingMessage: "Deleting area...",
-            onSuccess: () => {
-              fetchAreas(currentPage, search);
-            },
-            onError: (error) => {
-              alert("Error deleting area.");
+  const handleDeleteArea = (id) => {
+    // Show confirm dialog using StatusOverlay
+    setOverlayState({
+      isVisible: true,
+      message: "Are you sure you want to delete this area? This action cannot be undone.",
+      isError: true,
+      errorType: "general",
+      pendingAction: { type: 'delete', id }
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    const { pendingAction } = overlayState;
+    if (!pendingAction || pendingAction.type !== 'delete') return;
+    
+    setOverlayState({ ...overlayState, isVisible: false }); // Close confirm
+    
+    try {
+      await executeActionCall(
+        ({ signal }) => axios.delete(API_URLS.deleteArea(pendingAction.id), { signal }),
+        {
+          loadingMessage: "Deleting area...",
+          onSuccess: () => {
+            fetchAreas(currentPage, search);
+            setOverlayState({
+              isVisible: true,
+              message: "Area deleted successfully.",
+              isError: false,
+              errorType: "general",
+              pendingAction: null
+            });
+          },
+          onError: (error) => {
+            const status = error.originalError?.response?.status;
+            if (status === 401) {
+              setOverlayState({
+                isVisible: true,
+                message: "You are not authorized to delete areas. Please login with proper credentials.",
+                isError: true,
+                errorType: "unauthorized",
+                pendingAction: null
+              });
+            } else {
+              setOverlayState({
+                isVisible: true,
+                message: "Error deleting area. Please try again.",
+                isError: true,
+                errorType: "general",
+                pendingAction: null
+              });
             }
           }
-        );
-      } catch (err) {
-        // Error handled by hook
-      }
+        }
+      );
+    } catch (err) {
+      // Error handled by hook
     }
   };
 
@@ -105,28 +171,64 @@ const AddArea = () => {
     resetActionCall();
   };
 
+  // Determine what to show in the single overlay
+  const getOverlayProps = () => {
+    // Custom overlay states take priority
+    if (overlayState.isVisible) {
+      return overlayState;
+    }
+    
+    // Action loading (add/delete operations)
+    if (actionLoading) {
+      return {
+        isVisible: true,
+        message: "Processing...",
+        isError: false,
+        errorType: "general",
+        pendingAction: null
+      };
+    }
+    
+    // Action errors (add/delete failures)
+    if (actionError && !actionLoading) {
+      return {
+        isVisible: true,
+        message: actionError?.message || "Operation failed",
+        isError: true,
+        errorType: "general",
+        pendingAction: null
+      };
+    }
+    
+    // Areas loading
+    if (loadingAreas) {
+      return {
+        isVisible: true,
+        message: "Loading areas...",
+        isError: false,
+        errorType: "general",
+        pendingAction: null
+      };
+    }
+    
+    // Areas error
+    if (areasError && !loadingAreas) {
+      return {
+        isVisible: true,
+        message: areasError?.message || "Failed to load areas",
+        isError: true,
+        errorType: "general",
+        pendingAction: null
+      };
+    }
+    
+    return { isVisible: false };
+  };
+
+  const currentOverlay = getOverlayProps();
+
   return (
     <>
-      <LoadingOverlay 
-        isVisible={loadingAreas}
-        message="Loading areas..."
-      />
-      <LoadingOverlay 
-        isVisible={areasError && !loadingAreas}
-        message={areasError?.message}
-        isError={true}
-        onRetry={areasError?.canRetry ? handleAreasRetry : null}
-      />
-      <LoadingOverlay 
-        isVisible={actionLoading}
-        message="Processing..."
-      />
-      <LoadingOverlay 
-        isVisible={actionError && !actionLoading}
-        message={actionError?.message}
-        isError={true}
-        onRetry={actionError?.canRetry ? handleActionRetry : null}
-      />
 
       <div className="addarea-container">
       {/* Left - Add Area */}
@@ -180,6 +282,29 @@ const AddArea = () => {
         />
       </div>
       </div>
+
+      {/* Single unified StatusOverlay for all states */}
+              <StatusOverlay
+        isVisible={currentOverlay.isVisible}
+        message={currentOverlay.message}
+        isError={currentOverlay.isError}
+        errorType={currentOverlay.errorType}
+        onRetry={
+          currentOverlay.pendingAction?.type === 'delete' ? handleConfirmDelete :
+          areasError?.canRetry ? handleAreasRetry :
+          actionError?.canRetry ? handleActionRetry :
+          null
+        }
+        onClose={() => {
+          if (overlayState.isVisible) {
+            setOverlayState({ ...overlayState, isVisible: false });
+          } else {
+            resetAreasCall();
+            resetActionCall();
+          }
+        }}
+        onLoginAgain={currentOverlay.errorType === 'unauthorized' || currentOverlay.errorType === 'auth' ? logout : null}
+      />
     </>
   );
 };

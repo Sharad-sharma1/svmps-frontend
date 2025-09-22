@@ -1,5 +1,5 @@
-/* Loading Overlay Styles */
-.loading-overlay {
+/* Status Overlay Styles */
+.status-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -11,7 +11,7 @@
   justify-content: center;
 }
 
-.loading-overlay-backdrop {
+.status-overlay-backdrop {
   position: absolute;
   top: 0;
   left: 0;
@@ -21,7 +21,7 @@
   backdrop-filter: blur(3px);
 }
 
-.loading-overlay-content {
+.status-overlay-content {
   position: relative;
   background: white;
   padding: 3rem 2rem;
@@ -33,7 +33,7 @@
 }
 
 /* Spinner Animation */
-.loading-spinner {
+.status-spinner {
   position: relative;
   width: 80px;
   height: 80px;
@@ -79,8 +79,8 @@
   }
 }
 
-/* Loading Message */
-.loading-message {
+/* Status Message */
+.status-message {
   font-size: 1.2rem;
   color: #2c3e50;
   margin: 0 0 1rem 0;
@@ -88,22 +88,22 @@
 }
 
 /* Loading Dots Animation */
-.loading-dots {
+.status-dots {
   display: inline-flex;
   gap: 4px;
 }
 
-.loading-dots span {
+.status-dots span {
   font-size: 1.5rem;
   color: #3498db;
   animation: bounce 1.4s infinite ease-in-out;
 }
 
-.loading-dots span:nth-child(1) {
+.status-dots span:nth-child(1) {
   animation-delay: -0.32s;
 }
 
-.loading-dots span:nth-child(2) {
+.status-dots span:nth-child(2) {
   animation-delay: -0.16s;
 }
 
@@ -118,47 +118,106 @@
   }
 }
 
-/* Error State Styles */
-.error-icon {
+/* Status Icon */
+.status-icon {
   font-size: 4rem;
   margin-bottom: 1rem;
 }
 
-.error-message {
+.status-title {
+  font-size: 1.4rem;
+  color: #2c3e50;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+/* Error message styling by default */
+.status-message {
   font-size: 1.1rem;
   color: #e74c3c;
   margin: 0 0 2rem 0;
   line-height: 1.4;
 }
 
-.retry-button {
-  background: #3498db;
-  color: white;
+/* Success message styling */
+.success-message {
+  color: #27ae60 !important;
+}
+
+.success-title {
+  color: #27ae60 !important;
+}
+
+/* Button Container */
+.status-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Button Base Styles */
+.retry-button,
+.close-button,
+.login-button {
   border: none;
   padding: 12px 24px;
   border-radius: 6px;
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
+  min-width: 100px;
+}
+
+/* Retry Button */
+.retry-button {
+  background: #3498db;
+  color: white;
 }
 
 .retry-button:hover {
   background: #2980b9;
+  transform: translateY(-1px);
 }
 
-.retry-button:active {
-  transform: translateY(1px);
+/* Close/OK Button */
+.close-button {
+  background: #95a5a6;
+  color: white;
+}
+
+.close-button:hover {
+  background: #7f8c8d;
+  transform: translateY(-1px);
+}
+
+/* Login Again Button */
+.login-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.login-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 15px rgba(102, 126, 234, 0.4);
+}
+
+/* Active State for All Buttons */
+.retry-button:active,
+.close-button:active,
+.login-button:active {
+  transform: translateY(0);
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .loading-overlay-content {
+  .status-overlay-content {
     padding: 2rem 1.5rem;
     min-width: 280px;
   }
   
-  .loading-spinner {
+  .status-spinner {
     width: 60px;
     height: 60px;
   }
@@ -168,7 +227,23 @@
     height: 60px;
   }
   
-  .loading-message {
+  .status-message {
     font-size: 1.1rem;
+  }
+  
+  .status-title {
+    font-size: 1.2rem;
+  }
+  
+  .status-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .retry-button,
+  .close-button,
+  .login-button {
+    width: 100%;
+    min-width: auto;
   }
 }

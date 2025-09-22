@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { API_URLS } from "../../../utils/fetchurl";
 import { useRegularApiCall } from "../../../hooks/useApiCall";
-import LoadingOverlay from "../../common/LoadingOverlay";
+import { useAuth } from "../../../contexts/AuthContext";
+import StatusOverlay from "../../common/StatusOverlay";
 import Pagination from "../../common/Pagination";
 import "../addarea/Area.css";
 
@@ -15,8 +16,18 @@ const AddVillage = () => {
   const villagesPerPage = 10;
 
   // API call hooks  
+  // Enhanced popup state for StatusOverlay
+  const [overlayState, setOverlayState] = useState({
+    isVisible: false,
+    message: "",
+    isError: false,
+    errorType: "general",
+    pendingAction: null // for delete confirmations
+  });
+
   const { loading: loadingVillages, error: villagesError, execute: executeVillagesCall, reset: resetVillagesCall } = useRegularApiCall();
   const { loading: actionLoading, error: actionError, execute: executeActionCall, reset: resetActionCall } = useRegularApiCall();
+  const { isAuthenticated, logout } = useAuth(); // Add auth context
 
   const fetchVillages = async (page = 1, searchValue = "") => {
     try {
@@ -62,7 +73,24 @@ const AddVillage = () => {
               fetchVillages(currentPage, search);
             },
             onError: (error) => {
-              alert(error.originalError?.response?.data?.detail || "Error adding village.");
+              const status = error.originalError?.response?.status;
+              if (status === 401) {
+                setOverlayState({
+                  isVisible: true,
+                  message: "You are not authorized to add villages. Please login with proper credentials.",
+                  isError: true,
+                  errorType: "unauthorized",
+                  pendingAction: null
+                });
+              } else {
+                setOverlayState({
+                  isVisible: true,
+                  message: error.originalError?.response?.data?.detail || "Error adding village. Please try again.",
+                  isError: true,
+                  errorType: "general",
+                  pendingAction: null
+                });
+              }
             }
           }
         );
@@ -72,24 +100,62 @@ const AddVillage = () => {
     }
   };
 
-  const handleDeleteVillage = async (id) => {
-    if (window.confirm("Are you sure you want to delete this village?")) {
-      try {
-        await executeActionCall(
-          ({ signal }) => axios.delete(API_URLS.deleteVillage(id), { signal }),
-          {
-            loadingMessage: "Deleting village...",
-            onSuccess: () => {
-              fetchVillages(currentPage, search);
-            },
-            onError: (error) => {
-              alert("Error deleting village.");
+  const handleDeleteVillage = (id) => {
+    // Show confirm dialog using StatusOverlay
+    setOverlayState({
+      isVisible: true,
+      message: "Are you sure you want to delete this village? This action cannot be undone.",
+      isError: true,
+      errorType: "general",
+      pendingAction: { type: 'delete', id }
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    const { pendingAction } = overlayState;
+    if (!pendingAction || pendingAction.type !== 'delete') return;
+    
+    setOverlayState({ ...overlayState, isVisible: false }); // Close confirm
+    
+    try {
+      await executeActionCall(
+        ({ signal }) => axios.delete(API_URLS.deleteVillage(pendingAction.id), { signal }),
+        {
+          loadingMessage: "Deleting village...",
+          onSuccess: () => {
+            fetchVillages(currentPage, search);
+            setOverlayState({
+              isVisible: true,
+              message: "Village deleted successfully.",
+              isError: false,
+              errorType: "general",
+              pendingAction: null
+            });
+          },
+          onError: (error) => {
+            const status = error.originalError?.response?.status;
+            if (status === 401) {
+              setOverlayState({
+                isVisible: true,
+                message: "You are not authorized to delete villages. Please login with proper credentials.",
+                isError: true,
+                errorType: "unauthorized",
+                pendingAction: null
+              });
+            } else {
+              setOverlayState({
+                isVisible: true,
+                message: "Error deleting village. Please try again.",
+                isError: true,
+                errorType: "general",
+                pendingAction: null
+              });
             }
           }
-        );
-      } catch (err) {
-        // Error handled by hook
-      }
+        }
+      );
+    } catch (err) {
+      // Error handled by hook
     }
   };
 
@@ -105,28 +171,64 @@ const AddVillage = () => {
     resetActionCall();
   };
 
+  // Determine what to show in the single overlay
+  const getOverlayProps = () => {
+    // Custom overlay states take priority
+    if (overlayState.isVisible) {
+      return overlayState;
+    }
+    
+    // Action loading (add/delete operations)
+    if (actionLoading) {
+      return {
+        isVisible: true,
+        message: "Processing...",
+        isError: false,
+        errorType: "general",
+        pendingAction: null
+      };
+    }
+    
+    // Action errors (add/delete failures)
+    if (actionError && !actionLoading) {
+      return {
+        isVisible: true,
+        message: actionError?.message || "Operation failed",
+        isError: true,
+        errorType: "general",
+        pendingAction: null
+      };
+    }
+    
+    // Villages loading
+    if (loadingVillages) {
+      return {
+        isVisible: true,
+        message: "Loading villages...",
+        isError: false,
+        errorType: "general",
+        pendingAction: null
+      };
+    }
+    
+    // Villages error
+    if (villagesError && !loadingVillages) {
+      return {
+        isVisible: true,
+        message: villagesError?.message || "Failed to load villages",
+        isError: true,
+        errorType: "general",
+        pendingAction: null
+      };
+    }
+    
+    return { isVisible: false };
+  };
+
+  const currentOverlay = getOverlayProps();
+
   return (
     <>
-      <LoadingOverlay 
-        isVisible={loadingVillages}
-        message="Loading villages..."
-      />
-      <LoadingOverlay 
-        isVisible={villagesError && !loadingVillages}
-        message={villagesError?.message}
-        isError={true}
-        onRetry={villagesError?.canRetry ? handleVillagesRetry : null}
-      />
-      <LoadingOverlay 
-        isVisible={actionLoading}
-        message="Processing..."
-      />
-      <LoadingOverlay 
-        isVisible={actionError && !actionLoading}
-        message={actionError?.message}
-        isError={true}
-        onRetry={actionError?.canRetry ? handleActionRetry : null}
-      />
 
       <div className="addarea-container">
       {/* Left - Add Village */}
@@ -180,6 +282,29 @@ const AddVillage = () => {
         />
       </div>
       </div>
+
+      {/* Single unified StatusOverlay for all states */}
+              <StatusOverlay
+        isVisible={currentOverlay.isVisible}
+        message={currentOverlay.message}
+        isError={currentOverlay.isError}
+        errorType={currentOverlay.errorType}
+        onRetry={
+          currentOverlay.pendingAction?.type === 'delete' ? handleConfirmDelete :
+          villagesError?.canRetry ? handleVillagesRetry :
+          actionError?.canRetry ? handleActionRetry :
+          null
+        }
+        onClose={() => {
+          if (overlayState.isVisible) {
+            setOverlayState({ ...overlayState, isVisible: false });
+          } else {
+            resetVillagesCall();
+            resetActionCall();
+          }
+        }}
+        onLoginAgain={currentOverlay.errorType === 'unauthorized' || currentOverlay.errorType === 'auth' ? logout : null}
+      />
     </>
   );
 };

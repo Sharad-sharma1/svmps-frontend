@@ -3,7 +3,8 @@ import axios from "axios";
 import AsyncSelect from "react-select/async";
 import { API_URLS } from "../../../utils/fetchurl";
 import { useRegularApiCall } from "../../../hooks/useApiCall";
-import LoadingOverlay from "../../common/LoadingOverlay";
+import { useAuth } from "../../../contexts/AuthContext";
+import StatusOverlay from "../../common/StatusOverlay";
 import "./adduserdata.css";
 
 const AddUser = () => {
@@ -35,11 +36,20 @@ const AddUser = () => {
     receipt_amt: "",
   });
 
-  const [message, setMessage] = useState("");
   const [errors, setErrors] = useState({});
+  
+  // Enhanced popup state for StatusOverlay
+  const [overlayState, setOverlayState] = useState({
+    isVisible: false,
+    message: "",
+    isError: false,
+    errorType: "general",
+    pendingAction: null
+  });
   
   // API call hooks
   const { loading, error, execute, reset } = useRegularApiCall();
+  const { isAuthenticated, logout } = useAuth(); // Add auth context
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -52,7 +62,6 @@ const AddUser = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrors({});
-    setMessage("");
 
     const cleanedData = { ...formData };
     Object.keys(cleanedData).forEach((key) => {
@@ -65,7 +74,7 @@ const AddUser = () => {
         {
           loadingMessage: "Creating user data...",
           onSuccess: () => {
-            setMessage("✅ User Data created successfully!");
+            setErrors({});
             setFormData({
               usercode: "",
               name: "",
@@ -93,18 +102,56 @@ const AddUser = () => {
               receipt_date: "",
               receipt_amt: "",
             });
+            setOverlayState({
+              isVisible: true,
+              message: "User data created successfully.",
+              isError: false,
+              errorType: "general",
+              pendingAction: null
+            });
           },
           onError: (error) => {
-            if (error.originalError?.response && error.originalError.response.status === 422) {
-              const fieldErrors = {};
-              error.originalError.response.data.detail.forEach((err) => {
-                const field = err.loc[err.loc.length - 1];
-                fieldErrors[field] = err.msg;
+            const status = error.originalError?.response?.status;
+            if (status === 401) {
+              // Reset API error state to prevent double popups
+              reset();
+              setOverlayState({
+                isVisible: true,
+                message: "You are not authorized to create user data. Please login with proper credentials.",
+                isError: true,
+                errorType: "unauthorized",
+                pendingAction: null
               });
-              setErrors(fieldErrors);
+            } else if (status === 422) {
+              // Handle validation errors
+              const fieldErrors = {};
+              if (error.originalError.response.data.detail) {
+                error.originalError.response.data.detail.forEach((err) => {
+                  const field = err.loc[err.loc.length - 1];
+                  fieldErrors[field] = err.msg;
+                });
+                setErrors(fieldErrors);
+              }
+              // Reset API error state to prevent double popups
+              reset();
+              setOverlayState({
+                isVisible: true,
+                message: "Please check the form fields and fix validation errors.",
+                isError: true,
+                errorType: "general",
+                pendingAction: null
+              });
             } else {
               console.error(error);
-              setMessage("❌ Error creating user data");
+              // Reset API error state to prevent double popups
+              reset();
+              setOverlayState({
+                isVisible: true,
+                message: error.originalError?.response?.data?.detail || "Error creating user data. Please try again.",
+                isError: true,
+                errorType: "general",
+                pendingAction: null
+              });
             }
           }
         }
@@ -146,20 +193,24 @@ const AddUser = () => {
 
   const handleRetry = () => {
     reset();
+    setOverlayState({ ...overlayState, isVisible: false });
   };
+
+  const handleActionRetry = () => {
+    reset();
+  };
+
+  const getOverlayProps = () => {
+    if (overlayState.isVisible) return overlayState;
+    if (loading) return { isVisible: true, message: "Creating user data...", isError: false, errorType: "general" };
+    if (error && !loading) return { isVisible: true, message: error?.message || "Operation failed", isError: true, errorType: "general" };
+    return { isVisible: false };
+  };
+
+  const currentOverlay = getOverlayProps();
 
   return (
     <>
-      <LoadingOverlay 
-        isVisible={loading}
-        message="Creating user data..."
-      />
-      <LoadingOverlay 
-        isVisible={error && !loading}
-        message={error?.message}
-        isError={true}
-        onRetry={error?.canRetry ? handleRetry : null}
-      />
 
       <div className="form-container">
         <h2>Create User Data</h2>
@@ -258,9 +309,42 @@ const AddUser = () => {
         </div> */}
 
         <button type="submit">Create User Data</button>
-        {message && <p>{message}</p>}
+        
+        {/* Display validation errors */}
+        {Object.keys(errors).length > 0 && (
+          <div className="validation-errors">
+            <h4>Please fix the following errors:</h4>
+            <ul>
+              {Object.entries(errors).map(([field, message]) => (
+                <li key={field}>
+                  <strong>{field}:</strong> {message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </form>
       </div>
+      
+      {/* Single unified StatusOverlay for all states */}
+      <StatusOverlay
+        isVisible={currentOverlay.isVisible}
+        message={currentOverlay.message}
+        isError={currentOverlay.isError}
+        errorType={currentOverlay.errorType}
+        onRetry={
+          error?.canRetry ? handleActionRetry :
+          null
+        }
+        onClose={() => {
+          if (overlayState.isVisible) {
+            setOverlayState({ ...overlayState, isVisible: false });
+          } else {
+            reset();
+          }
+        }}
+        onLoginAgain={currentOverlay.errorType === 'unauthorized' || currentOverlay.errorType === 'auth' ? logout : null}
+      />
     </>
   );
 };

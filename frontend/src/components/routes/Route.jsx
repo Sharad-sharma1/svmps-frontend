@@ -8,64 +8,65 @@ import Showuser from '../views/showuserdata/ShowUser'
 import Printuser from '../views/printdata/PrintData'
 import Adduser from '../views/adduserdata/AddUser'
 import CreateReceipt from '../views/createreceipt/CreateReceipt'
+import ProtectedRoute from '../auth/ProtectedRoute'
 
 const router = createHashRouter(
   [
     {
       path: "/home",
       element:
-        <div>
+        <ProtectedRoute>
           <Navbar />
           <Home />
-        </div>
+        </ProtectedRoute>
     },
     {
       path: "/area",
       element:
-        <div>
+        <ProtectedRoute>
           <Navbar />
           <Addarea />
-        </div>
+        </ProtectedRoute>
     },
     {
       path: "/village",
       element:
-        <div>
+        <ProtectedRoute>
           <Navbar />
           <Addvillage />
-        </div>
+        </ProtectedRoute>
     },
     {
       path: "/user",
       element:
-        <div>
+        <ProtectedRoute>
           <Navbar />
           <Adduser />
-        </div>
+        </ProtectedRoute>
     },
     {
       path: "/showuser",
       element:
-        <div>
+        <ProtectedRoute>
           <Navbar />
           <Showuser />
-        </div>
+        </ProtectedRoute>
     },
     {
       path: "/receipts",
       element:
-        <div>
+        <ProtectedRoute>
           <Navbar />
           <Printuser />
-        </div>
+        </ProtectedRoute>
     },
     {
       path: "/create-receipt",
       element:
-        <div>
+        <ProtectedRoute>
           <Navbar />
           <CreateReceipt />
-        </div>
+        </ProtectedRoute>
     },
     {
       path: "/",

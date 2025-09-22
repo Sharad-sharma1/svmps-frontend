@@ -1,37 +1,21 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
+import StatusOverlay from '../../common/StatusOverlay';
+import SiddhapurLogo from '../../../assets/images/Siddhapur_Logo_01.png';
+import OrganizationLogo from '../../../assets/images/organization-logo.bmp';
 import './CreateReceipt.css';
 
-// Function to convert English numbers to Gujarati numerals
-const convertToGujaratiNumerals = (num) => {
-  if (!num) return '';
-  const englishToGujarati = {
-    '0': '૦', '1': '૧', '2': '૨', '3': '૩', '4': '૪',
-    '5': '૫', '6': '૬', '7': '૭', '8': '૮', '9': '૯'
-  };
-  return num.toString().replace(/[0-9]/g, (digit) => englishToGujarati[digit] || digit);
-};
-
-// Function to convert Gujarati numerals to English numbers
-const convertToEnglishNumbers = (gujaratiNum) => {
-  if (!gujaratiNum) return '';
-  const gujaratiToEnglish = {
-    '૦': '0', '૧': '1', '૨': '2', '૩': '3', '૪': '4',
-    '૫': '5', '૬': '6', '૭': '7', '૮': '8', '૯': '9'
-  };
-  return gujaratiNum.toString().replace(/[૦-૯]/g, (digit) => gujaratiToEnglish[digit] || digit);
-};
-
-// Function to convert numbers to Gujarati words
-const numberToGujaratiWords = (num) => {
+// Function to convert numbers to English words
+const numberToEnglishWords = (num) => {
   if (!num || num === '' || isNaN(num)) return '';
   
   const number = parseInt(num);
-  if (number === 0) return 'શૂન્ય';
+  if (number === 0) return 'Zero';
   
-  const ones = ['', 'એક', 'બે', 'ત્રણ', 'ચાર', 'પાંચ', 'છ', 'સાત', 'આઠ', 'નવ'];
-  const teens = ['દસ', 'અગિયાર', 'બાર', 'તેર', 'ચૌદ', 'પંદર', 'સોળ', 'સત્તર', 'અઢાર', 'ઓગણીસ'];
-  const tens = ['', '', 'વીસ', 'ત્રીસ', 'ચાળીસ', 'પચાસ', 'સાઠ', 'સિત્તેર', 'એંસી', 'નેવું'];
-  const hundreds = ['', 'એકસો', 'બેસો', 'ત્રણસો', 'ચારસો', 'પાંચસો', 'છસો', 'સાતસો', 'આઠસો', 'નવસો'];
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+  const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const hundreds = ['', 'One Hundred', 'Two Hundred', 'Three Hundred', 'Four Hundred', 'Five Hundred', 'Six Hundred', 'Seven Hundred', 'Eight Hundred', 'Nine Hundred'];
   
   if (number < 10) {
     return ones[number];
@@ -40,20 +24,20 @@ const numberToGujaratiWords = (num) => {
   } else if (number < 100) {
     return tens[Math.floor(number / 10)] + (number % 10 ? ' ' + ones[number % 10] : '');
   } else if (number < 1000) {
-    return hundreds[Math.floor(number / 100)] + (number % 100 ? ' ' + numberToGujaratiWords(number % 100) : '');
+    return hundreds[Math.floor(number / 100)] + (number % 100 ? ' ' + numberToEnglishWords(number % 100) : '');
   } else if (number < 100000) {
-    return numberToGujaratiWords(Math.floor(number / 1000)) + ' હજાર' + (number % 1000 ? ' ' + numberToGujaratiWords(number % 1000) : '');
+    return numberToEnglishWords(Math.floor(number / 1000)) + ' Thousand' + (number % 1000 ? ' ' + numberToEnglishWords(number % 1000) : '');
   } else if (number < 10000000) {
-    return numberToGujaratiWords(Math.floor(number / 100000)) + ' લાખ' + (number % 100000 ? ' ' + numberToGujaratiWords(number % 100000) : '');
+    return numberToEnglishWords(Math.floor(number / 100000)) + ' Lakh' + (number % 100000 ? ' ' + numberToEnglishWords(number % 100000) : '');
   } else {
-    return numberToGujaratiWords(Math.floor(number / 10000000)) + ' કરોડ' + (number % 10000000 ? ' ' + numberToGujaratiWords(number % 10000000) : '');
+    return numberToEnglishWords(Math.floor(number / 10000000)) + ' Crore' + (number % 10000000 ? ' ' + numberToEnglishWords(number % 10000000) : '');
   }
 };
 
 const CreateReceipt = () => {
   const [receiptData, setReceiptData] = useState({
     receiptNo: '',
-    date: new Date().toLocaleDateString('en-GB').split('/').join('-'), // Today's date in DD-MM-YYYY format
+    date: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format for HTML date input
     name: '',
     village: '',
     residence: '',
@@ -61,62 +45,76 @@ const CreateReceipt = () => {
     relation: '',
     paymentMode: '',
     paymentDetails: '',
+    donation1Purpose: '',
     donation1: '',
     donation2: '',
     total: ''
   });
 
-  // State for display values (Gujarati numerals)
-  const [displayValues, setDisplayValues] = useState({
-    donation1Display: '',
-    donation2Display: '',
-    totalDisplay: '',
-    totalWordsDisplay: '',
-    dateDisplay: ''
-  });
+  // State for total words display
+  const [totalWordsDisplay, setTotalWordsDisplay] = useState('');
 
   const [isPreviewMode, setIsPreviewMode] = useState(false);
 
-  // Auto-generate receipt number on component mount and set initial date display
+  // Format number with Indian comma system
+  const formatIndianNumber = (num) => {
+    if (!num) return '';
+    const cleanNum = num.toString().replace(/,/g, '');
+    if (!/^\d+$/.test(cleanNum)) return num;
+    
+    const numStr = cleanNum.toString();
+    const lastThree = numStr.substring(numStr.length - 3);
+    const otherNumbers = numStr.substring(0, numStr.length - 3);
+    
+    if (otherNumbers !== '') {
+      return otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + lastThree;
+    } else {
+      return lastThree;
+    }
+  };
+
+  // Remove commas to get actual number value
+  const getNumericValue = (formattedNum) => {
+    return formattedNum.toString().replace(/,/g, '');
+  };
+
+  // Enhanced popup state for StatusOverlay
+  const [overlayState, setOverlayState] = useState({
+    isVisible: false,
+    message: "",
+    isError: false,
+    errorType: "general",
+    pendingAction: null
+  });
+
+  const { logout } = useAuth();
+
+  // Auto-generate receipt number on component mount
   useEffect(() => {
     generateReceiptNumber();
-    // Set initial date display in Gujarati numerals (DD-MM-YYYY format)
-    const todayDate = new Date().toLocaleDateString('en-GB').split('/').join('-');
-    setDisplayValues(prev => ({
-      ...prev,
-      dateDisplay: convertToGujaratiNumerals(todayDate)
-    }));
   }, []);
 
   // Auto-calculate total when donations change
   useEffect(() => {
-    const donation1Amount = parseFloat(receiptData.donation1) || 0;
-    const donation2Amount = parseFloat(receiptData.donation2) || 0;
+    const donation1Amount = parseFloat(getNumericValue(receiptData.donation1)) || 0;
+    const donation2Amount = parseFloat(getNumericValue(receiptData.donation2)) || 0;
     const calculatedTotal = donation1Amount + donation2Amount;
     
     // Update total if there's a sum, or clear it if both fields are empty
     if (calculatedTotal > 0) {
-      const totalString = calculatedTotal.toString();
+      const totalString = formatIndianNumber(calculatedTotal.toString());
       setReceiptData(prev => ({
         ...prev,
         total: totalString
       }));
-      // Update total display with Gujarati numerals and words
-      setDisplayValues(prev => ({
-        ...prev,
-        totalDisplay: convertToGujaratiNumerals(totalString),
-        totalWordsDisplay: numberToGujaratiWords(totalString)
-      }));
+      // Update total words display with English words
+      setTotalWordsDisplay(numberToEnglishWords(calculatedTotal.toString()));
     } else if (receiptData.donation1 === '' && receiptData.donation2 === '') {
       setReceiptData(prev => ({
         ...prev,
         total: ''
       }));
-      setDisplayValues(prev => ({
-        ...prev,
-        totalDisplay: '',
-        totalWordsDisplay: ''
-      }));
+      setTotalWordsDisplay('');
     }
   }, [receiptData.donation1, receiptData.donation2]);
 
@@ -135,37 +133,15 @@ const CreateReceipt = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
-    // Handle amount fields specially for Gujarati numeral conversion
+    // Handle amount fields with validation and formatting
     if (name === 'donation1' || name === 'donation2') {
-      // Convert Gujarati numerals to English numbers for calculation
-      const englishValue = convertToEnglishNumbers(value);
-      // Only allow numbers and decimal point
-      if (englishValue === '' || /^\d*\.?\d*$/.test(englishValue)) {
+      // Remove commas and validate input
+      const numericValue = getNumericValue(value);
+      if (numericValue === '' || /^\d*\.?\d*$/.test(numericValue)) {
+        const formattedValue = formatIndianNumber(numericValue);
         setReceiptData(prev => ({
           ...prev,
-          [name]: englishValue
-        }));
-        // Update display value with Gujarati numerals
-        setDisplayValues(prev => ({
-          ...prev,
-          [`${name}Display`]: convertToGujaratiNumerals(englishValue)
-        }));
-      }
-    } else if (name === 'date') {
-      // Handle date field for Gujarati numeral conversion
-      // Convert Gujarati numerals back to English for storage
-      const englishValue = convertToEnglishNumbers(value);
-      
-      // Validate date format DD-MM-YYYY (allow partial input)
-      if (englishValue === '' || /^\d{0,2}-?\d{0,2}-?\d{0,4}$/.test(englishValue)) {
-        setReceiptData(prev => ({
-          ...prev,
-          [name]: englishValue
-        }));
-        // Update date display with Gujarati numerals
-        setDisplayValues(prev => ({
-          ...prev,
-          dateDisplay: convertToGujaratiNumerals(englishValue)
+          [name]: formattedValue
         }));
       }
     } else {
@@ -180,28 +156,183 @@ const CreateReceipt = () => {
     try {
       // TODO: Implement database save functionality
       console.log('Saving receipt data:', receiptData);
-      alert('Receipt saved successfully! (Database integration pending)');
+      
+      // Show success message and switch to preview mode
+      setOverlayState({
+        isVisible: true,
+        message: "Receipt saved successfully! (Database integration pending)",
+        isError: false,
+        errorType: "general",
+        pendingAction: { type: 'switchToPreview' }
+      });
     } catch (error) {
       console.error('Error saving receipt:', error);
-      alert('Error saving receipt. Please try again.');
+      setOverlayState({
+        isVisible: true,
+        message: "Error saving receipt. Please try again.",
+        isError: true,
+        errorType: "general",
+        pendingAction: null
+      });
     }
+  };
+
+  const optimizePrintStyles = () => {
+    // Force print styles to load by adding a temporary print media stylesheet
+    const printCSS = document.createElement('style');
+    printCSS.innerHTML = `
+      @media print {
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        .create-receipt-container { background: white !important; }
+        .create-receipt-container::after {
+          content: "" !important;
+          position: fixed !important;
+          top: 148.5mm !important;
+          left: 0 !important;
+          right: 0 !important;
+          width: 100vw !important;
+          height: 1px !important;
+          background: transparent !important;
+          border-top: 1px dashed #000 !important;
+          z-index: 1000 !important;
+          display: block !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        .receipt { 
+          font-family: 'Noto Sans Gujarati', 'Noto Sans', Arial, sans-serif !important; 
+          width: 200mm !important; 
+          border: 3px solid #000 !important;
+          padding: 5px !important;
+          margin: 15mm auto 0 auto !important;
+          transform: none !important;
+          max-height: 135mm !important;
+          position: relative !important;
+          font-size: 11pt !important;
+        }
+        .receipt::before {
+          content: "Original receipt" !important;
+          position: absolute !important;
+          top: -8mm !important;
+          left: 50% !important;
+          transform: translateX(-50%) !important;
+          font-size: 14px !important;
+          font-weight: 700 !important;
+          color: #000 !important;
+          text-align: center !important;
+          width: 100% !important;
+          display: block !important;
+        }
+        .receipt-header { 
+          background: #000 !important; 
+          color: #ffffff !important; 
+          display: flex !important;
+          height: 60px !important;
+        }
+        .receipt-header * { color: #ffffff !important; }
+        .receipt-header .title { 
+          color: #ffffff !important; 
+          font-weight: 700 !important; 
+          font-size: 18px !important;
+        }
+        .footer-sign { 
+          margin-top: 8px !important; 
+          padding-right: 10px !important; 
+          font-size: 11px !important;
+          font-weight: 800 !important;
+        }
+        .donation thead th { 
+          background: #d9d9d9 !important; 
+          color: #000 !important; 
+          border: 2px solid #000 !important;
+          font-size: 10px !important;
+          height: 18px !important;
+          padding: 1px 3px !important;
+        }
+        .devotional-line { font-size: 14px !important; }
+        .contact-line { font-size: 10px !important; }
+        .form-row label { font-size: 10px !important; }
+        .form-row .input-line { font-size: 10px !important; height: 16px !important; padding: 1px 3px !important; }
+        .donation tbody td { font-size: 9px !important; height: 12px !important; padding: 1px 4px !important; }
+        .donation .total-row td { font-size: 11px !important; height: 14px !important; padding: 1px 4px !important; }
+        .donation .total-row td:first-child { text-align: left !important; padding-left: 8px !important; font-weight: normal !important; }
+        .form-row { margin-bottom: 3px !important; gap: 4px !important; }
+        .donation { margin-top: 3px !important; }
+        .receipt-form-area { padding: 3px 3px 0 3px !important; }
+        .payment-dropdown { height: 20px !important; padding: 1px 3px !important; }
+      }
+    `;
+    document.head.appendChild(printCSS);
+    
+    // Remove after print is done
+    setTimeout(() => {
+      if (document.head.contains(printCSS)) {
+        document.head.removeChild(printCSS);
+      }
+    }, 5000);
   };
 
   const handlePrintReceipt = () => {
     setIsPreviewMode(true);
+    
+    // Optimize print styles
+    optimizePrintStyles();
+    
+    // Wait for DOM to update and styles to apply
     setTimeout(() => {
-      window.print();
-    }, 100);
+      // Ensure all images are loaded before printing
+      const images = document.querySelectorAll('.receipt img');
+      let imagesLoaded = 0;
+      const totalImages = images.length;
+      
+      const checkImagesAndPrint = () => {
+        if (imagesLoaded === totalImages) {
+          // Additional delay to ensure styles are fully applied
+          setTimeout(() => {
+            window.print();
+          }, 200);
+        }
+      };
+      
+      if (totalImages === 0) {
+        // No images to wait for
+        setTimeout(() => {
+          window.print();
+        }, 300);
+      } else {
+        images.forEach((img) => {
+          if (img.complete) {
+            imagesLoaded++;
+          } else {
+            img.onload = () => {
+              imagesLoaded++;
+              checkImagesAndPrint();
+            };
+            img.onerror = () => {
+              imagesLoaded++; // Count even failed images
+              checkImagesAndPrint();
+            };
+          }
+        });
+        checkImagesAndPrint();
+      }
+    }, 150);
   };
 
   const handleDownloadPDF = () => {
     // TODO: Implement PDF download functionality using libraries like jsPDF or react-pdf
     console.log('Downloading PDF:', receiptData);
-    alert('PDF download functionality will be implemented soon!');
+    setOverlayState({
+      isVisible: true,
+      message: "PDF download functionality will be implemented soon!",
+      isError: false,
+      errorType: "general",
+      pendingAction: null
+    });
   };
 
   const handleReset = () => {
-    const todayDate = new Date().toLocaleDateString('en-GB').split('/').join('-');
+    const todayDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format for HTML date input
     setReceiptData({
       receiptNo: '',
       date: todayDate,
@@ -212,19 +343,22 @@ const CreateReceipt = () => {
       relation: '',
       paymentMode: '',
       paymentDetails: '',
+      donation1Purpose: '',
       donation1: '',
       donation2: '',
       total: ''
     });
-    setDisplayValues({
-      donation1Display: '',
-      donation2Display: '',
-      totalDisplay: '',
-      totalWordsDisplay: '',
-      dateDisplay: convertToGujaratiNumerals(todayDate)
-    });
+    setTotalWordsDisplay('');
     generateReceiptNumber();
     setIsPreviewMode(false);
+  };
+
+  // Handle overlay actions
+  const handleOverlayAction = (action) => {
+    if (action?.type === 'switchToPreview') {
+      setIsPreviewMode(true);
+    }
+    setOverlayState({ ...overlayState, isVisible: false });
   };
 
   return (
@@ -236,14 +370,19 @@ const CreateReceipt = () => {
             <button onClick={handleSaveReceipt} className="btn btn-save">
               💾 Save Receipt
             </button>
+          </div>
+        </div>
+      )}
+
+      {isPreviewMode && (
+        <div className="receipt-actions no-print">
+          <h1 className="page-title">Receipt Preview</h1>
+          <div className="action-buttons">
+            <button onClick={() => setIsPreviewMode(false)} className="btn btn-edit">
+              ✏️ Edit Receipt
+            </button>
             <button onClick={handlePrintReceipt} className="btn btn-print">
               🖨️ Print Receipt
-            </button>
-            <button onClick={handleDownloadPDF} className="btn btn-download">
-              📄 Download PDF
-            </button>
-            <button onClick={handleReset} className="btn btn-reset">
-              🔄 Reset Form
             </button>
           </div>
         </div>
@@ -251,26 +390,37 @@ const CreateReceipt = () => {
 
       <div className="receipt-form">
         <div className="receipt">
+          <div className="devotional-line">
+            ॥ શ્રી વિશ્વકર્મણે નમઃ ॥
+          </div>
           <div className="receipt-header">
             <div className="left">
-              <div className="logo-placeholder">
-                🏛️
+              <div className="logo-container left-container">
+                <img 
+                  src={SiddhapurLogo} 
+                  alt="Siddhapur Logo" 
+                  className="receipt-logo left-logo"
+                />
               </div>
             </div>
             <div className="title">
-              શ્રી વિરધર્મા ધાનદાર મેવાડા સુધાર સમાજ<br />
-              સમૂહ લગન ટ્રસ્ટ, સિદ્ધપુર
+              શ્રી વિશ્વકર્મા ધાનધાર મેવાડા સુથાર સમાજ <br />
+              સમૂહ લગ્ન ટ્રસ્ટ, સિધ્ધપુર
             </div>
             <div className="right">
-              <div className="logo-placeholder">
-                🏛️
+              <div className="logo-container">
+                <img 
+                  src={OrganizationLogo} 
+                  alt="Organization Logo" 
+                  className="receipt-logo right-logo"
+                />
               </div>
             </div>
           </div>
           
           <div className="contact-info">
-            <div className="contact-line">રજી. નં. ૯/૧૦, પાટણ, તા. ૩-૧૨-૨૦૦૮</div>
-            <div className="contact-line">C/o. "સેવા સદન" મેવાડા ટીમભિની સામે, દેવલી રોડ, સિદ્ધપુર - ૩૪૫૧૫</div>
+            <div className="contact-line">રજી. નં. એ/૯૭૮, પાટણ તા.૩-૧૨-૨૦૦૮</div>
+            <div className="contact-line">C/o."સેવા સદન" મેવાડા ટીમ્બરની સામે, દેથળી રોડ, સિધ્ધપુર - ૩૮૪૧૫૧</div>
           </div>
           
           <div className="separator"></div>
@@ -289,16 +439,15 @@ const CreateReceipt = () => {
                 style={{borderBottom: 'none'}}
               />
               <div style={{flex: 1}}></div>
-              <label style={{width: '60px', marginLeft: '40px'}}>તારીખ</label>
+              <label style={{width: '40px', marginLeft: '80px'}}>તારીખ</label>
               <input
                 className="input-line date-input"
-                type="text"
+                type="date"
                 name="date"
-                value={displayValues.dateDisplay}
+                value={receiptData.date}
                 onChange={handleInputChange}
                 readOnly={isPreviewMode}
-                placeholder="DD-MM-YYYY"
-                style={{width: '90px', marginRight: '20px', borderBottom: 'none', fontSize: '1rem'}}
+                style={{marginRight: '5px', borderBottom: 'none'}}
               />
             </div>
             
@@ -399,12 +548,23 @@ const CreateReceipt = () => {
             <tbody>
               <tr>
                 <td className="col-no">1</td>
-                <td className="col-desc">કંડોગ્રીઃ (કોર્પસ ફંડ) / _____ સમૂહ લગન ખર્ચ / દાન ભેટ</td>
+                <td className="col-desc">
+                  કંડોગ્રીઃ (કોર્પસ ફંડ) / 
+                  <input
+                    type="text"
+                    name="donation1Purpose"
+                    value={receiptData.donation1Purpose}
+                    onChange={handleInputChange}
+                    placeholder="ખર્ચ પ્રકાર લખો"
+                    readOnly={isPreviewMode}
+                  />
+                  સમૂહ લગ્ન ખર્ચ / દાન ભેટ
+                </td>
                 <td className="col-amt">
                   <input
                     type="text"
                     name="donation1"
-                    value={displayValues.donation1Display}
+                    value={receiptData.donation1}
                     onChange={handleInputChange}
                     placeholder="Amount"
                     readOnly={isPreviewMode}
@@ -418,7 +578,7 @@ const CreateReceipt = () => {
                   <input
                     type="text"
                     name="donation2"
-                    value={displayValues.donation2Display}
+                    value={receiptData.donation2}
                     onChange={handleInputChange}
                     placeholder="Amount"
                     readOnly={isPreviewMode}
@@ -426,19 +586,19 @@ const CreateReceipt = () => {
                 </td>
               </tr>
               <tr className="total-row">
-                <td colSpan="2" style={{textAlign:'left', paddingLeft:'8px', verticalAlign:'middle', fontSize:'1.1rem', fontWeight:'normal', height:'32px'}}>
-                  <span style={{fontWeight:'bold'}}>અંકે રૂપિયા: </span>{displayValues.totalWordsDisplay && `${displayValues.totalWordsDisplay} રૂપિયા`}
+                <td colSpan="2" style={{textAlign:'left', paddingLeft:'8px', verticalAlign:'middle', fontSize:'1rem', fontWeight:'normal', height:'32px'}}>
+                  <span style={{fontWeight:'bold'}}>અંકે રૂપિયા: </span><span style={{fontWeight:'normal'}}>{totalWordsDisplay && `${totalWordsDisplay} Rupees`}</span>
                 </td>
-                <td className="col-amt" style={{position:'relative', height:'32px'}}>
+                <td className="col-amt">
                   <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', width:'100%'}}>
-                    <span style={{fontWeight:'bold', fontSize:'1.1rem'}}>કુલ</span>
+                    <span style={{fontWeight:'bold', fontSize:'1rem'}}>કુલ</span>
                     <input
                       type="text"
                       name="total"
-                      value={displayValues.totalDisplay}
+                      value={receiptData.total}
                       onChange={handleInputChange}
                       readOnly
-                      style={{width:'auto', minWidth:'60px', textAlign:'right', border:'none', background:'transparent', fontSize:'1.1rem', fontWeight:'normal'}}
+                      style={{width:'auto', minWidth:'60px', textAlign:'right', border:'none', background:'transparent', fontSize:'0.85rem', fontWeight:'normal'}}
                     />
                   </div>
                 </td>
@@ -446,19 +606,24 @@ const CreateReceipt = () => {
             </tbody>
           </table>
 
-          <div style={{height:'20px'}}></div>
+          <div style={{height:'30px'}}></div>
           
-          <div className="footer-sign">સ્વીકૃતિ કરનારની સહી</div>
+          <div className="footer-sign">સ્વીકૃત કરનારની સહી</div>
         </div>
       </div>
 
-      {isPreviewMode && (
-        <div className="preview-actions no-print">
-          <button onClick={() => setIsPreviewMode(false)} className="btn btn-edit">
-            ✏️ Edit Receipt
-          </button>
-        </div>
-      )}
+      {/* StatusOverlay for all popup messages */}
+      <StatusOverlay
+        isVisible={overlayState.isVisible}
+        message={overlayState.message}
+        isError={overlayState.isError}
+        errorType={overlayState.errorType}
+        onRetry={null}
+        onClose={() => {
+          handleOverlayAction(overlayState.pendingAction);
+        }}
+        onLoginAgain={overlayState.errorType === 'unauthorized' || overlayState.errorType === 'auth' ? logout : null}
+      />
     </div>
   );
 };

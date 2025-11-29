@@ -914,6 +914,18 @@
   }
 }
 
+/* Hide duplicate receipt on screen only */
+.copy-receipt {
+  display: none !important;
+}
+
+/* Show duplicate receipt when printing */
+@media print {
+  .copy-receipt {
+    display: block !important;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .create-receipt-container {

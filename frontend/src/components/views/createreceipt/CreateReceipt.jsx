@@ -178,27 +178,11 @@ const CreateReceipt = () => {
   };
 
   const optimizePrintStyles = () => {
-    // Force print styles to load by adding a temporary print media stylesheet
     const printCSS = document.createElement('style');
     printCSS.innerHTML = `
       @media print {
         * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         .create-receipt-container { background: white !important; }
-        .create-receipt-container::after {
-          content: "" !important;
-          position: fixed !important;
-          top: 148.5mm !important;
-          left: 0 !important;
-          right: 0 !important;
-          width: 100vw !important;
-          height: 1px !important;
-          background: transparent !important;
-          border-top: 1px dashed #000 !important;
-          z-index: 1000 !important;
-          display: block !important;
-          margin: 0 !important;
-          padding: 0 !important;
-        }
         .receipt { 
           font-family: 'Noto Sans Gujarati', 'Noto Sans', Arial, sans-serif !important; 
           width: 200mm !important; 
@@ -286,8 +270,6 @@ const CreateReceipt = () => {
   };
 
   const handlePrintReceipt = () => {
-    setIsPreviewMode(true);
-    
     // Optimize print styles
     optimizePrintStyles();
     
@@ -635,7 +617,7 @@ const CreateReceipt = () => {
               <div className="logo-container left-container">
                 <img 
                   src={SiddhapurLogo} 
-                  alt="Siddhapur Logo" 
+                  alt="Siddhapુર Logo" 
                   className="receipt-logo left-logo"
                 />
               </div>

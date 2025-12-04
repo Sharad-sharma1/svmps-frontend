@@ -89,6 +89,52 @@
   transform: translateY(-2px);
 }
 
+.btn-new {
+  background: #9C27B0;
+  color: white;
+}
+
+.btn-new:hover {
+  background: #7B1FA2;
+  transform: translateY(-2px);
+}
+
+.btn-back {
+  background: #6B7280;
+  color: white;
+}
+
+.btn-back:hover {
+  background: #4B5563;
+  transform: translateY(-2px);
+}
+
+/* Loading Receipt State */
+.loading-receipt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #4a5568;
+  background: white;
+  border-radius: 12px;
+  margin: 2rem auto;
+  max-width: 400px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.loading-spinner {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* Receipt Form Container */
 .receipt-form {
   display: flex;
@@ -286,6 +332,21 @@
 .form-row .input-line:read-only {
   border-bottom: 2px solid #999;
   background: #f9f9f9;
+}
+
+/* Specific styling for read-only receipt number field */
+.receipt-no-readonly {
+  background-color: #f3f4f6 !important;
+  color: #4b5563 !important;
+  cursor: not-allowed !important;
+  font-weight: 600 !important;
+  border-bottom-color: #9ca3af !important;
+}
+
+.receipt-no-readonly:focus {
+  background-color: #f3f4f6 !important;
+  border-bottom-color: #6b7280 !important;
+  outline: none !important;
 }
 
 .form-row .input-line::placeholder {

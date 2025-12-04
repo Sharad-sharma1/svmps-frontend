@@ -24,6 +24,7 @@ class User(Base):
     # Relationships
     user_roles = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    created_receipts = relationship("Receipt", back_populates="creator")
 
 
 class Role(Base):

@@ -79,3 +79,65 @@ svmps_frontend/
 │   └── package.json           # npm config
 │
 └── README.md
+
+## 📊 Database Schema
+
+### Receipts Table
+```sql
+CREATE TABLE receipts (
+    id SERIAL PRIMARY KEY,
+    
+    -- Receipt identification (format: RC1/2025/1234)
+    receipt_no VARCHAR(50) NOT NULL UNIQUE,
+    receipt_date DATE NOT NULL,
+    
+    -- Donor information
+    donor_name VARCHAR(255) NOT NULL,
+    village VARCHAR(255),
+    residence VARCHAR(255), 
+    mobile VARCHAR(15),
+    relation_address TEXT,
+    
+    -- Payment information
+    payment_mode VARCHAR(10) CHECK (payment_mode IN ('Cash', 'Check', 'Online')) NOT NULL,
+    payment_details VARCHAR(500),
+    
+    -- Donation details
+    donation1_purpose VARCHAR(500),
+    donation1_amount DECIMAL(15,2) DEFAULT 0.00,
+    donation2_amount DECIMAL(15,2) DEFAULT 0.00,
+    total_amount DECIMAL(15,2) NOT NULL,
+    total_amount_words TEXT,
+    
+    -- Status tracking
+    status VARCHAR(10) CHECK (status IN ('completed', 'cancelled')) DEFAULT 'completed',
+    
+    -- User reference
+    created_by INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+);
+
+-- Indexes for performance
+CREATE INDEX idx_receipt_no ON receipts (receipt_no);
+CREATE INDEX idx_receipt_date ON receipts (receipt_date);
+CREATE INDEX idx_donor_name ON receipts (donor_name);
+CREATE INDEX idx_mobile ON receipts (mobile);
+CREATE INDEX idx_created_by ON receipts (created_by);
+CREATE INDEX idx_status ON receipts (status);
+```
+
+### Receipt Number Format
+- **Format**: `{creator_code}/{year}/{receipt_id:04d}` (4-digit zero-padded ID)
+- **Creator Codes**: Based on username and role
+  - `admin` (superadmin) → `RCA` (Receipt Creator Admin)
+  - `receipt_creator1` → `RC1` (Receipt Creator 1)
+  - `receipt_creator2` → `RC2` (Receipt Creator 2)  
+- **Examples**: 
+  - `RCA/2025/0001` (Admin created receipt ID 1 in 2025)
+  - `RC1/2025/0002` (receipt_creator1 created receipt ID 2 in 2025)
+  - `RC2/2025/0003` (receipt_creator2 created receipt ID 3 in 2025)
+- **Generation**: Auto-generated after database insert using username-based logic
+- **Note**: Only admin and receipt_creator* users can create receipts

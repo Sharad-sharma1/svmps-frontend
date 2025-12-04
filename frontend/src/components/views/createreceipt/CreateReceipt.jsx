@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import StatusOverlay from '../../common/StatusOverlay';
 import SiddhapurLogo from '../../../assets/images/Siddhapur_Logo_01.png';
 import OrganizationLogo from '../../../assets/images/organization-logo.bmp';
+import { API_URLS } from '../../../utils/fetchurl';
+import { handleAPIError, formatPermissionMessage } from '../../../utils/errorHandler';
+import axios from 'axios';
 import './CreateReceipt.css';
 
 // Function to convert numbers to English words
@@ -87,12 +91,41 @@ const CreateReceipt = () => {
     pendingAction: null
   });
 
-  const { logout } = useAuth();
+  const { logout, user, token } = useAuth();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  
+  // Loading state for save operation
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // State to track if receipt is saved (to show actual receipt number)
+  const [isSaved, setIsSaved] = useState(false);
+  
+  // State to track receipt ID for updates
+  const [receiptId, setReceiptId] = useState(null);
+  
+  // State to determine if we're in edit mode (updating existing receipt)
+  const [isEditMode, setIsEditMode] = useState(false);
+  
+  // State to track if we're loading an existing receipt
+  const [isLoadingReceipt, setIsLoadingReceipt] = useState(false);
+  
+  // State to track the original context - true if came from modify receipt list
+  const [cameFromModifyList, setCameFromModifyList] = useState(false);
 
-  // Auto-generate receipt number on component mount
+  // Auto-generate receipt number on component mount OR load existing receipt
   useEffect(() => {
+    const editReceiptId = searchParams.get('edit');
+    if (editReceiptId) {
+      // User came from modify receipt list to edit existing receipt
+      setCameFromModifyList(true);
+      loadReceiptForEdit(parseInt(editReceiptId));
+    } else {
+      // User came to create new receipt
+      setCameFromModifyList(false);
     generateReceiptNumber();
-  }, []);
+    }
+  }, [searchParams]);
 
   // Auto-calculate total when donations change
   useEffect(() => {
@@ -119,15 +152,94 @@ const CreateReceipt = () => {
   }, [receiptData.donation1, receiptData.donation2]);
 
   const generateReceiptNumber = () => {
-    // TODO: In future, get the next receipt number from database
+    // Generate placeholder receipt number showing user will get RCX/YYYY/XXXX format
     const currentYear = new Date().getFullYear();
-    const randomNum = Math.floor(Math.random() * 10000);
-    const receiptNo = `RCT/${currentYear}/${randomNum.toString().padStart(4, '0')}`;
+    const receiptNo = `RCX/${currentYear}/XXXX`;
     
     setReceiptData(prev => ({
       ...prev,
       receiptNo: receiptNo
     }));
+    
+    setIsSaved(false); // Reset saved state when generating new receipt
+    setReceiptId(null); // Clear receipt ID for new receipt
+    setIsEditMode(false); // Reset to create mode
+  };
+
+  // Load existing receipt for editing
+  const loadReceiptForEdit = async (id) => {
+    try {
+      setIsLoadingReceipt(true);
+      console.log('Loading receipt for edit:', id);
+      
+      const response = await axios.get(API_URLS.getReceipt(id));
+      
+      // Check for graceful permission error first
+      if (response.data.status === 'error' && response.data.error_code === 'PERMISSION_DENIED') {
+        // Handle graceful permission error by throwing with response data
+        const permissionError = new Error(response.data.message || 'Permission denied');
+        permissionError.response = response;
+        throw permissionError;
+      }
+      
+      if (response.data.status === 'success' && response.data.data) {
+        const receipt = response.data.data;
+        console.log('Loaded receipt data:', receipt);
+        
+        // Map backend data to frontend format
+        setReceiptData({
+          receiptNo: receipt.receipt_no,
+          date: receipt.receipt_date?.split('T')[0] || receipt.receipt_date,
+          name: receipt.donor_name || '',
+          village: receipt.village || '',
+          residence: receipt.residence || '',
+          mobile: receipt.mobile || '',
+          relation: receipt.relation_address || '',
+          paymentMode: receipt.payment_mode === 'Cash' ? 'કેશ / Cash' : 
+                      receipt.payment_mode === 'Check' ? 'ચેક / Check' :
+                      receipt.payment_mode === 'Online' ? 'ઓનલાઈન / Online' : 'કેશ / Cash',
+          paymentDetails: receipt.payment_details || '',
+          donation1Purpose: receipt.donation1_purpose || '',
+          donation1: receipt.donation1_amount ? formatIndianNumber(receipt.donation1_amount.toString()) : '',
+          donation2: receipt.donation2_amount ? formatIndianNumber(receipt.donation2_amount.toString()) : '',
+          total: receipt.total_amount ? formatIndianNumber(receipt.total_amount.toString()) : ''
+        });
+        
+        // Set total words display
+        if (receipt.total_amount_words) {
+          setTotalWordsDisplay(receipt.total_amount_words.replace(' Rupees', ''));
+        }
+        
+        // Set states for editing existing receipt
+        setReceiptId(receipt.id);
+        setIsSaved(true);
+        setIsEditMode(true);
+        setIsPreviewMode(true); // Start in preview mode like after saving
+        
+        console.log('Receipt loaded successfully for editing');
+      } else {
+        throw new Error('Receipt not found');
+      }
+    } catch (error) {
+      console.error('Error loading receipt:', error);
+      
+      let errorMessage = "Failed to load receipt for editing.";
+      if (error.response?.status === 404) {
+        errorMessage = "Receipt not found. It may have been deleted.";
+      } else if (error.response?.status === 403) {
+        errorMessage = "You don't have permission to edit this receipt.";
+      }
+      
+      setOverlayState({
+        isVisible: true,
+        message: errorMessage,
+        isError: true,
+        errorType: "general",
+        pendingAction: { type: 'goBackToModify' }
+      });
+    } finally {
+      setIsLoadingReceipt(false);
+    }
   };
 
   const handleInputChange = (e) => {
@@ -154,26 +266,177 @@ const CreateReceipt = () => {
 
   const handleSaveReceipt = async () => {
     try {
-      // TODO: Implement database save functionality
+      // Validate required fields
+      if (!receiptData.name || !receiptData.total) {
+        setOverlayState({
+          isVisible: true,
+          message: "Please fill in required fields: Name and Total Amount",
+          isError: true,
+          errorType: "validation",
+          pendingAction: null
+        });
+        return;
+      }
+
+      // Validate total amount
+      const totalAmount = parseFloat(getNumericValue(receiptData.total));
+      if (!totalAmount || totalAmount <= 0) {
+        setOverlayState({
+          isVisible: true,
+          message: "Please enter a valid total amount",
+          isError: true,
+          errorType: "validation",
+          pendingAction: null
+        });
+        return;
+      }
+
+      setIsSaving(true);
       console.log('Saving receipt data:', receiptData);
       
+      // Helper function to safely parse float
+      const safeParseFloat = (value) => {
+        if (!value || value === '') return 0.00;
+        const numericValue = getNumericValue(value);
+        const parsed = parseFloat(numericValue);
+        return isNaN(parsed) ? 0.00 : parsed;
+      };
+      
+      // Helper function to extract payment mode
+      const getPaymentMode = (paymentModeValue) => {
+        if (!paymentModeValue || paymentModeValue === '') {
+          return 'Cash'; // Default to Cash
+        }
+        
+        // Handle Gujarati/English mixed values like "કેશ / Cash"
+        if (paymentModeValue.includes('/')) {
+          const englishPart = paymentModeValue.split('/')[1]?.trim();
+          if (englishPart) {
+            return englishPart;
+          }
+        }
+        
+        // Map common variations
+        const modeMap = {
+          'cash': 'Cash',
+          'Cash': 'Cash',
+          'check': 'Check', 
+          'Check': 'Check',
+          'cheque': 'Check',
+          'Cheque': 'Check',
+          'online': 'Online',
+          'Online': 'Online'
+        };
+        
+        return modeMap[paymentModeValue] || 'Cash';
+      };
+
+      // Prepare data for API (match backend ReceiptCreate model)
+      const apiData = {
+        receipt_date: receiptData.date,
+        donor_name: receiptData.name.trim(),
+        village: receiptData.village?.trim() || null,
+        residence: receiptData.residence?.trim() || null,
+        mobile: receiptData.mobile?.trim() || null,
+        relation_address: receiptData.relation?.trim() || null,
+        payment_mode: getPaymentMode(receiptData.paymentMode),
+        payment_details: receiptData.paymentDetails?.trim() || null,
+        donation1_purpose: receiptData.donation1Purpose?.trim() || null,
+        donation1_amount: safeParseFloat(receiptData.donation1),
+        donation2_amount: safeParseFloat(receiptData.donation2),
+        total_amount: totalAmount,
+        total_amount_words: totalWordsDisplay ? `${totalWordsDisplay} Rupees` : null
+      };
+
+      console.log('API payload:', apiData);
+      
+      // Additional debugging to check data types
+      console.log('Data types validation:');
+      console.log('- receipt_date:', typeof apiData.receipt_date, apiData.receipt_date);
+      console.log('- donor_name:', typeof apiData.donor_name, `"${apiData.donor_name}"`);
+      console.log('- payment_mode:', typeof apiData.payment_mode, `"${apiData.payment_mode}"`);
+      console.log('- donation1_amount:', typeof apiData.donation1_amount, apiData.donation1_amount);
+      console.log('- donation2_amount:', typeof apiData.donation2_amount, apiData.donation2_amount);
+      console.log('- total_amount:', typeof apiData.total_amount, apiData.total_amount);
+
+      // Make API call - create new receipt OR update existing receipt
+      let response;
+      if (isEditMode && receiptId) {
+        console.log('Updating existing receipt with ID:', receiptId);
+        response = await axios.put(API_URLS.updateReceipt(receiptId), apiData);
+      } else {
+        console.log('Creating new receipt');
+        response = await axios.post(API_URLS.createReceipt(), apiData);
+      }
+      
+      console.log('Receipt created successfully:', response.data);
+      
+      // Check for graceful permission error first
+      if (response.data.status === 'error' && response.data.error_code === 'PERMISSION_DENIED') {
+        // Handle graceful permission error by throwing with response data
+        const permissionError = new Error(response.data.message || 'Permission denied');
+        permissionError.response = response;
+        throw permissionError;
+      }
+      
+      if (response.data.status === 'success' && response.data.data) {
+        // Update receipt data with actual receipt number from backend
+        const savedReceipt = response.data.data;
+        
+        setReceiptData(prev => ({
+          ...prev,
+          receiptNo: savedReceipt.receipt_no // This will be like "RCA/2025/0001" or "RC1/2025/0002"
+        }));
+        
+        // Store receipt ID and set states based on context
+        if (!isEditMode) {
+          // Only set receipt ID on first creation
+          setReceiptId(savedReceipt.id);
+        }
+        setIsSaved(true); // Mark as saved to show actual receipt number
+        
+        // Only set edit mode if we came from modify receipt list
+        // If user came from create receipt page, keep it as create mode for "Create New Receipt" button
+        if (cameFromModifyList) {
+          setIsEditMode(true); // User came from modify list, show "Back to List"
+        }
+        // If !cameFromModifyList, keep isEditMode as false so "Create New Receipt" shows
+      
       // Show success message and switch to preview mode
+        const action = isEditMode ? 'updated' : 'created';
       setOverlayState({
         isVisible: true,
-        message: "Receipt saved successfully! (Database integration pending)",
+          message: `Receipt ${savedReceipt.receipt_no} ${action} successfully!`,
         isError: false,
         errorType: "general",
         pendingAction: { type: 'switchToPreview' }
       });
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (error) {
       console.error('Error saving receipt:', error);
+      
+      const errorInfo = handleAPIError(error, "Error saving receipt. Please try again.");
+      
+      let displayMessage = errorInfo.message;
+      if (errorInfo.isPermissionError) {
+        displayMessage = formatPermissionMessage(
+          errorInfo.message,
+          errorInfo.availableRoles,
+          errorInfo.userRoles
+        );
+      }
+      
       setOverlayState({
         isVisible: true,
-        message: "Error saving receipt. Please try again.",
+        message: displayMessage,
         isError: true,
-        errorType: "general",
+        errorType: errorInfo.type,
         pendingAction: null
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -327,6 +590,9 @@ const CreateReceipt = () => {
   };
 
   const handleReset = () => {
+    setIsSaved(false); // Reset saved state
+    setReceiptId(null); // Clear receipt ID
+    setIsEditMode(false); // Reset to create mode
     const todayDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format for HTML date input
     setReceiptData({
       receiptNo: '',
@@ -348,28 +614,48 @@ const CreateReceipt = () => {
     setIsPreviewMode(false);
   };
 
+  const handleCreateNewReceipt = () => {
+    // Directly reset to create new receipt - no loading screen needed
+    handleReset();
+  };
+
   // Handle overlay actions
   const handleOverlayAction = (action) => {
     if (action?.type === 'switchToPreview') {
       setIsPreviewMode(true);
+    } else if (action?.type === 'goBackToModify') {
+      // Navigate back to modify receipts page
+      navigate('/modify-receipt');
     }
     setOverlayState({ ...overlayState, isVisible: false });
   };
 
   return (
     <div className="create-receipt-container">
-      {!isPreviewMode && (
+      {/* Loading state for existing receipt */}
+      {isLoadingReceipt && (
+        <div className="loading-receipt">
+          <div className="loading-spinner">⏳</div>
+          <span>Loading receipt for editing...</span>
+        </div>
+      )}
+
+      {!isLoadingReceipt && !isPreviewMode && (
         <div className="receipt-actions">
-          <h1 className="page-title">Create Receipt</h1>
+          <h1 className="page-title">{isEditMode ? 'Edit Receipt' : 'Create Receipt'}</h1>
           <div className="action-buttons">
-            <button onClick={handleSaveReceipt} className="btn btn-save">
-              💾 Save Receipt
+            <button 
+              onClick={handleSaveReceipt} 
+              className="btn btn-save"
+              disabled={isSaving || isPreviewMode}
+            >
+              {isSaving ? '⏳ Saving...' : (isEditMode ? '✏️ Update Receipt' : '💾 Save Receipt')}
             </button>
           </div>
         </div>
       )}
 
-      {isPreviewMode && (
+      {!isLoadingReceipt && isPreviewMode && (
         <div className="receipt-actions no-print">
           <h1 className="page-title">Receipt Preview</h1>
           <div className="action-buttons">
@@ -379,6 +665,16 @@ const CreateReceipt = () => {
             <button onClick={handlePrintReceipt} className="btn btn-print">
               🖨️ Print Receipt
             </button>
+            {cameFromModifyList && (
+              <button onClick={() => navigate('/modify-receipt')} className="btn btn-back">
+                ⬅️ Back to List
+              </button>
+            )}
+            {!cameFromModifyList && (
+              <button onClick={handleCreateNewReceipt} className="btn btn-new">
+                ➕ Create New Receipt
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -424,14 +720,15 @@ const CreateReceipt = () => {
             <div className="form-row">
               <label>રસીદ નં.</label>
               <input
-                className="input-line"
+                className="input-line receipt-no-readonly"
                 type="text"
                 name="receiptNo"
                 value={receiptData.receiptNo}
                 onChange={handleInputChange}
-                readOnly={isPreviewMode}
+                readOnly={true}
                 placeholder="Receipt Number"
                 style={{borderBottom: 'none'}}
+                title="Receipt number is auto-generated and cannot be edited"
               />
               <div style={{flex: 1}}></div>
               <label style={{width: '40px', marginLeft: '80px'}}>તારીખ</label>
@@ -470,7 +767,7 @@ const CreateReceipt = () => {
                 placeholder="Village"
                 readOnly={isPreviewMode}
               />
-              <label style={{width: '90px'}}>રહેવાણ :</label>
+              <label style={{width: '90px'}}>રહેઠાણ :</label>
               <input
                 className="input-line"
                 type="text"
@@ -648,14 +945,15 @@ const CreateReceipt = () => {
             <div className="form-row">
               <label>રસીદ નં.</label>
               <input
-                className="input-line"
+                className="input-line receipt-no-readonly"
                 type="text"
                 name="receiptNo"
                 value={receiptData.receiptNo}
                 onChange={handleInputChange}
-                readOnly={isPreviewMode}
+                readOnly={true}
                 placeholder="Receipt Number"
                 style={{borderBottom: 'none'}}
+                title="Receipt number is auto-generated and cannot be edited"
               />
               <div style={{flex: 1}}></div>
               <label style={{width: '40px', marginLeft: '80px'}}>તારીખ</label>
@@ -694,7 +992,7 @@ const CreateReceipt = () => {
                 placeholder="Village"
                 readOnly={isPreviewMode}
               />
-              <label style={{width: '90px'}}>રહેવાણ :</label>
+              <label style={{width: '90px'}}>રહેઠાણ :</label>
               <input
                 className="input-line"
                 type="text"

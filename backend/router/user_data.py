@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from api_request_response.user_data import User_dataCreate, User_dataUpdate
 from controller import user_data as user_data_controller
-from login.dependencies import require_user_data_viewer, require_user_data_editor
+from login.dependencies import require_user_data_viewer, require_user_data_editor, get_current_user
 from models.auth import User
 
 router = APIRouter()
@@ -99,14 +99,55 @@ def delete_user_data(
 @router.get("/user_data/stats", status_code=status.HTTP_200_OK)
 def get_user_data_stats(
     db: db_dependency,
-    current_user: User = Depends(require_user_data_viewer)
+    current_user: User = Depends(get_current_user)
 ):
     """
     API to get user data statistics.
-    Requires: user_data_viewer, user_data_editor, or admin role
+    
+    **Permissions**:
+    - **admin, user_data_editor, user_data_viewer**: Get full user data statistics
+    - **receipt_creator, receipt_report_viewer**: Get default/empty statistics (graceful handling)
     """
     try:
-        response = user_data_controller.get_user_data_stats_controller(db)
-        return response
+        # Get user roles
+        from manager.auth import get_user_roles
+        user_roles = get_user_roles(db, current_user.id)
+        
+        # Check if user has permission for user data statistics
+        allowed_roles = ["admin", "user_data_editor", "user_data_viewer"]
+        has_user_data_access = any(role in allowed_roles for role in user_roles)
+        
+        if has_user_data_access:
+            # User has permission - return real statistics
+            response = user_data_controller.get_user_data_stats_controller(db)
+            return response
+        else:
+            # User doesn't have permission - return default/empty statistics gracefully
+            print(f"DEBUG: User {current_user.username} with roles {user_roles} doesn't have user_data access - returning default stats")
+            return {
+                "status": "success",
+                "message": "User statistics not available for your role",
+                "data": {
+                    "total_users": 0,
+                    "active_users": 0,
+                    "inactive_users": 0,
+                    "recently_added": 0,
+                    "total_villages": 0,
+                    "total_areas": 0
+                }
+            }
     except Exception as e:
-        raise
+        # Return default stats on any error to prevent breaking the frontend
+        print(f"ERROR in /user_data/stats: {str(e)}")
+        return {
+            "status": "success",
+            "message": "Statistics unavailable",
+            "data": {
+                "total_users": 0,
+                "active_users": 0,
+                "inactive_users": 0,
+                "recently_added": 0,
+                "total_villages": 0,
+                "total_areas": 0
+            }
+        }

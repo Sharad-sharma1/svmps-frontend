@@ -42,6 +42,21 @@ const Navbar = () => {
       {/* Sidebar */}
       <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <button className="close-btn" onClick={closeSidebar}>×</button>
+        
+        {/* User Info Display */}
+        <div className="user-info-card">
+          <div className="user-avatar">
+            <span className="user-icon">👤</span>
+          </div>
+          <div className="user-details">
+            <div className="user-name">{user?.username || 'Guest'}</div>
+            <div className="user-role">{user?.roles ? user.roles.join(', ') : 'User'}</div>
+            <div className="user-status">🟢 Online</div>
+          </div>
+        </div>
+        
+        <div className="sidebar-divider"></div>
+        
         <Link to="/home" className="sidebar-link" onClick={closeSidebar}>Home</Link>
         <Link to="/area" className="sidebar-link" onClick={closeSidebar}>Area</Link>
         <Link to="/village" className="sidebar-link" onClick={closeSidebar}>Village</Link>

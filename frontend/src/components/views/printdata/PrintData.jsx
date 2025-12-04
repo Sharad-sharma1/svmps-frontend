@@ -13,12 +13,10 @@ const PrintData = () => {
         navigate('/create-receipt');
         break;
       case 'reports':
-        // TODO: Implement reports functionality
-        alert('Reports functionality will be implemented soon!');
+        navigate('/reports');
         break;
       case 'modify-receipt':
-        // TODO: Implement modify receipt functionality
-        alert('Modify Receipt functionality will be implemented soon!');
+        navigate('/modify-receipt');
         break;
       default:
         console.log('Unknown action:', action);

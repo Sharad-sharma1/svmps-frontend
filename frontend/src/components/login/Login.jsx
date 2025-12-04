@@ -38,13 +38,39 @@ const Login = () => {
       console.log('API Response:', { status: response.status, data }); // Debug log
 
       if (response.ok && data.access_token) {
-        console.log('Login successful');
+        console.log('Login successful, fetching user data...');
         
-        // Use auth context to store authentication data
-        login(data);
-        
-        // Navigate to home page
-        navigate('/home');
+        // Now fetch user data using the token
+        try {
+          const userResponse = await fetch(API_URLS.getCurrentUser(), {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${data.access_token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          const userData = await userResponse.json();
+          console.log('User data fetched:', userData);
+          
+          if (userResponse.ok && userData.status === 'success') {
+            // Use auth context to store both token and user data
+            login(data, userData.data);
+            
+            // Navigate to home page
+            navigate('/home');
+          } else {
+            console.error('Failed to fetch user data:', userData);
+            // Still proceed with login but without detailed user info
+            login(data);
+            navigate('/home');
+          }
+        } catch (userError) {
+          console.error('Error fetching user data:', userError);
+          // Still proceed with login but without detailed user info
+          login(data);
+          navigate('/home');
+        }
       } else {
         // Handle API error response
         let errorMessage = 'Invalid userid or password';

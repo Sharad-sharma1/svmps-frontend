@@ -179,5 +179,16 @@ export const API_URLS = {
   // Authentication
   login: () => `${getBaseUrl()}/auth/login`,
   register: () => `${getBaseUrl()}/auth/register`,
-  logout: () => `${getBaseUrl()}/auth/logout`
+  logout: () => `${getBaseUrl()}/auth/logout`,
+  getCurrentUser: () => `${getBaseUrl()}/auth/me`,
+  getAllUsers: () => `${getBaseUrl()}/auth/users`,  // Get all system users (admin only)
+  getReceiptCreators: () => `${getBaseUrl()}/receipts/creators`,  // Get users who have created receipts (for reports filtering)
+  
+  // Receipts
+  createReceipt: () => `${getBaseUrl()}/receipts/`,
+  getReceipt: (id) => `${getBaseUrl()}/receipts/${id}`,
+  getAllReceipts: () => `${getBaseUrl()}/receipts/`,
+  updateReceipt: (id) => `${getBaseUrl()}/receipts/${id}`,
+  deleteReceipt: (id) => `${getBaseUrl()}/receipts/${id}`,
+  getReceiptStats: () => `${getBaseUrl()}/receipts/stats/summary`
 };

@@ -127,6 +127,7 @@ class ReceiptFilter(BaseModel):
     donor_name: Optional[str] = None
     village: Optional[str] = None
     payment_mode: Optional[str] = None
+    donation1_purpose: Optional[str] = None
     status: Optional[str] = None
     date_from: Optional[date] = None
     date_to: Optional[date] = None

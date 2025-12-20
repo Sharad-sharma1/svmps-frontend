@@ -183,6 +183,7 @@ export const API_URLS = {
   getCurrentUser: () => `${getBaseUrl()}/auth/me`,
   getAllUsers: () => `${getBaseUrl()}/auth/users`,  // Get all system users (admin only)
   getReceiptCreators: () => `${getBaseUrl()}/receipts/creators`,  // Get users who have created receipts (for reports filtering)
+  getReceiptReportsDropdown: () => `${getBaseUrl()}/receipts/reports/dropdown`,  // Get users with role IDs 1 & 5 for reports dropdown
   
   // Receipts
   createReceipt: () => `${getBaseUrl()}/receipts/`,

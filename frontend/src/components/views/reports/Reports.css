@@ -347,21 +347,24 @@
   transform: translateY(-1px);
 }
 
-.reports-btn-refresh {
-  background: #bee3f8;
-  color: #2c5282;
+.reports-btn-search {
+  background: #4299e1;
+  color: white;
   padding: 0.5rem 0.6rem;
   font-size: 0.8rem;
   min-height: 38px;
   box-sizing: border-box;
   border: 1px solid transparent;
   border-radius: 6px;
+  font-weight: 600;
 }
 
-.reports-btn-refresh:hover {
-  background: #90cdf4;
+.reports-btn-search:hover {
+  background: #3182ce;
   transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(66, 153, 225, 0.3);
 }
+
 
 .reports-btn-export {
   background: #c6f6d5;

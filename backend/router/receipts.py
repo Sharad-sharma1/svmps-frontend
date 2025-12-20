@@ -182,6 +182,7 @@ async def list_receipts(
     donor_name: Optional[str] = Query(None, description="Filter by donor name"),
     village: Optional[str] = Query(None, description="Filter by village"),
     payment_mode: Optional[str] = Query(None, description="Filter by payment mode"),
+    donation1_purpose: Optional[str] = Query(None, description="Filter by donation purpose"),
     status: Optional[str] = Query(None, description="Filter by status"),
     date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
@@ -221,12 +222,13 @@ async def list_receipts(
         
         # Create filters object
         filters = None
-        if any([donor_name, village, payment_mode, status, date_from, date_to, created_by]):
+        if any([donor_name, village, payment_mode, donation1_purpose, status, date_from, date_to, created_by]):
             from datetime import datetime
             filters = ReceiptFilter(
                 donor_name=donor_name,
                 village=village,
                 payment_mode=payment_mode,
+                donation1_purpose=donation1_purpose,
                 status=status,
                 date_from=datetime.strptime(date_from, "%Y-%m-%d").date() if date_from else None,
                 date_to=datetime.strptime(date_to, "%Y-%m-%d").date() if date_to else None,
@@ -389,6 +391,38 @@ async def debug_database(
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@router.get("/reports/dropdown", status_code=status.HTTP_200_OK)
+async def get_receipt_reports_dropdown(
+    db: db_dependency,
+    current_user: user_dependency,
+):
+    """
+    Get users with role IDs 1 and 5 for receipt reports dropdown
+    
+    **Permissions**:
+    - **admin**: Can access dropdown for filtering reports
+    - **receipt_report_viewer**: Can access dropdown for filtering reports
+    - **receipt_creator**: No access (they only see own receipts)
+    """
+    try:
+        # Get user roles
+        from manager.auth import get_user_roles
+        user_roles = get_user_roles(db, current_user.id)
+        
+        response = receipts_controller.get_receipt_reports_dropdown_controller(
+            db, current_user.id, user_roles
+        )
+        
+        return response
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to load receipt reports dropdown: {str(e)}",
+            "data": []
+        }
 
 
 @router.get("/debug/user-permissions", status_code=status.HTTP_200_OK)

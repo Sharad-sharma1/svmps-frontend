@@ -387,3 +387,54 @@ def get_receipt_creators_controller(db_session: Session, user_id: int, user_role
             "data": [],
             "message": "No creators available"
         }
+
+
+def get_receipt_reports_dropdown_controller(db_session: Session, user_id: int, user_roles: List[str]):
+    """
+    Controller to get users with role IDs 1 and 5 for receipt reports dropdown
+    
+    Args:
+        db_session: Database session
+        user_id: Current user ID
+        user_roles: Current user roles
+        
+    Returns:
+        List of users with role IDs 1 and 5
+    """
+    try:
+        # Check if user has permission to access reports
+        from login.permissions import user_has_permission, Permission as Perm
+        
+        has_read_receipts = user_has_permission(user_roles, Perm.READ_RECEIPTS)
+        is_admin = "admin" in user_roles
+        
+        # Only admin and receipt_report_viewer should access this dropdown
+        # receipt_creator doesn't need this since they only see their own receipts
+        if not (has_read_receipts or is_admin):
+            return {
+                "status": "error",
+                "message": "You don't have permission to access receipt reports dropdown.",
+                "error_code": "PERMISSION_DENIED",
+                "data": []
+            }
+        
+        # Get users with role IDs 1 and 5
+        users = receipts_manager.get_users_by_role_ids(db_session, [1, 5])
+        
+        response = {
+            "status": "success",
+            "data": users,
+            "message": f"Retrieved {len(users)} users for receipt reports dropdown"
+        }
+        
+        return response
+        
+    except Exception as e:
+        print(f"ERROR: Controller - Failed to get receipt reports dropdown: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "status": "error",
+            "message": "Failed to load dropdown data",
+            "data": []
+        }

@@ -182,22 +182,35 @@ def get_receipts_paginated(
                 )
             if filters.payment_mode:
                 query = query.filter(Receipt.payment_mode == filters.payment_mode)
+            if filters.donation1_purpose:
+                query = query.filter(Receipt.donation1_purpose.ilike(f"%{filters.donation1_purpose}%"))
             if filters.status:
                 query = query.filter(Receipt.status == filters.status)
             if filters.date_from:
-                query = query.filter(Receipt.receipt_date >= filters.date_from)
+                # Convert date to datetime (start of day)
+                from datetime import datetime, time
+                start_datetime = datetime.combine(filters.date_from, time.min)
+                query = query.filter(Receipt.receipt_date >= start_datetime)
             if filters.date_to:
-                query = query.filter(Receipt.receipt_date <= filters.date_to)
-            if filters.created_by and user_roles and "admin" in user_roles:
-                # Only admin can filter by creator
-                query = query.filter(Receipt.created_by == filters.created_by)
+                # Convert date to datetime (end of day)
+                from datetime import datetime, time
+                end_datetime = datetime.combine(filters.date_to, time.max)
+                query = query.filter(Receipt.receipt_date <= end_datetime)
+            if filters.created_by and user_roles:
+                # Admin and receipt_report_viewer can filter by creator
+                from login.permissions import user_has_permission, Permission as Perm
+                has_read_receipts = user_has_permission(user_roles, Perm.READ_RECEIPTS)
+                is_admin = "admin" in user_roles
+                
+                if has_read_receipts or is_admin:
+                    query = query.filter(Receipt.created_by == filters.created_by)
         
         # Get total count before applying pagination
         total_count = query.count()
         
         # Apply pagination and ordering
         offset = (page_num - 1) * page_size
-        receipts = query.order_by(desc(Receipt.created_at)).offset(offset).limit(page_size).all()
+        receipts = query.order_by(desc(Receipt.receipt_date)).offset(offset).limit(page_size).all()
         
         return {
             "total_count": total_count,
@@ -447,3 +460,45 @@ def get_creators_usernames(db_session: Session, creator_ids: List[int]) -> Dict[
     except Exception:
         # Return empty dict on error - graceful fallback
         return {}
+
+
+def get_users_by_role_ids(db_session: Session, role_ids: List[int]) -> List[Dict[str, Any]]:
+    """
+    Get users with specific role IDs for receipt reports dropdown
+    
+    Args:
+        db_session: Database session
+        role_ids: List of role IDs to filter by (e.g., [1, 5])
+        
+    Returns:
+        List of dictionaries with user id and username
+    """
+    try:
+        from models.auth import User, UserRole
+        
+        # Join query to get users with specified role IDs
+        users = (
+            db_session.query(User.id, User.username)
+            .join(UserRole, User.id == UserRole.user_id)
+            .filter(UserRole.role_id.in_(role_ids))
+            .filter(User.is_active == True)
+            .distinct()
+            .order_by(User.username)
+            .all()
+        )
+        
+        # Convert to list of dictionaries
+        result = []
+        for user_id, username in users:
+            result.append({
+                "id": user_id,
+                "username": username
+            })
+        
+        return result
+        
+    except Exception as e:
+        print(f"ERROR in get_users_by_role_ids: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return []

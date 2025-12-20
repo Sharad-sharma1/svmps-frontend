@@ -146,10 +146,12 @@ def get_receipts_controller(
     page_num: int = 1,
     page_size: int = 10,
     user_id: Optional[int] = None,
-    user_roles: Optional[List[str]] = None
+    user_roles: Optional[List[str]] = None,
+    pdf: bool = False,
+    csv: bool = False
 ):
     """
-    Controller to get receipts with pagination and filtering
+    Controller to get receipts with pagination and filtering, or export as PDF/CSV
     
     Args:
         db_session: Database session
@@ -158,11 +160,20 @@ def get_receipts_controller(
         page_size: Items per page
         user_id: Current user ID
         user_roles: Current user roles
+        pdf: Export as PDF
+        csv: Export as CSV
         
     Returns:
-        Response dictionary with paginated receipts
+        Response dictionary with paginated receipts or StreamingResponse for exports
     """
     try:
+        # Handle PDF/CSV export
+        if pdf or csv:
+            export_data = receipts_manager.get_receipts_for_export(
+                db_session, filters, user_id, user_roles, pdf, csv
+            )
+            return export_data
+
         # Get receipts from manager
         result = receipts_manager.get_receipts_paginated(
             db_session, filters, page_num, page_size, user_id, user_roles

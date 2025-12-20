@@ -177,8 +177,8 @@ async def get_receipt(
 async def list_receipts(
     db: db_dependency,
     current_user: user_dependency,
-    page_num: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(10, ge=1, le=100, description="Items per page"),
+    page_num: Optional[int] = Query(1, ge=1, description="Page number"),
+    page_size: Optional[int] = Query(10, ge=1, le=10000, description="Items per page"),
     donor_name: Optional[str] = Query(None, description="Filter by donor name"),
     village: Optional[str] = Query(None, description="Filter by village"),
     payment_mode: Optional[str] = Query(None, description="Filter by payment mode"),
@@ -186,15 +186,19 @@ async def list_receipts(
     status: Optional[str] = Query(None, description="Filter by status"),
     date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
-    created_by: Optional[int] = Query(None, description="Filter by creator (admin only)"),
+    created_by: Optional[int] = Query(None, description="Filter by creator"),
+    pdf: Optional[bool] = Query(False, description="Export as PDF"),
+    csv: Optional[bool] = Query(False, description="Export as CSV"),
 ):
     """
-    Get paginated list of receipts with optional filters
+    Get paginated list of receipts with optional filters, or export as PDF/CSV
     
     **Permissions**:
     - **admin**: Can see all receipts and use all filters
     - **receipt_report_viewer**: Can see all receipts, limited filters
     - **receipt_creator**: Can only see their own receipts, limited filters
+    
+    **Export**: Set pdf=true or csv=true to download all filtered data
     """
     try:
         # Get user roles
@@ -236,7 +240,7 @@ async def list_receipts(
             )
         
         response = receipts_controller.get_receipts_controller(
-            db, filters, page_num, page_size, current_user.id, user_roles
+            db, filters, page_num, page_size, current_user.id, user_roles, pdf, csv
         )
         
         return response

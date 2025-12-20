@@ -7,8 +7,17 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session, Query
 from sqlalchemy import and_, or_, desc
 from fastapi import HTTPException, status
+from fastapi.responses import StreamingResponse
 from datetime import datetime
 import time
+from io import BytesIO, StringIO
+
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+import pandas as pd
 
 from models.receipts import Receipt
 from api_request_response.receipts import ReceiptCreate, ReceiptUpdate, ReceiptFilter
@@ -93,7 +102,12 @@ def create_receipt(db_session: Session, receipt_data: ReceiptCreate, user_id: in
         # Step 3: Generate final receipt number with creator code
         year = datetime.now().year
         creator_code = get_receipt_creator_code(db_session, user_id)
-        final_receipt_no = f"{creator_code}/{year}/{new_receipt.id:04d}"
+        # Subtract 630 from ID for receipt number (e.g., ID 1407 -> 777)
+        receipt_sequence = new_receipt.id - 630
+        # Ensure sequence is positive (fallback to ID if result would be negative)
+        if receipt_sequence <= 0:
+            receipt_sequence = new_receipt.id
+        final_receipt_no = f"{creator_code}/{year}/{receipt_sequence:04d}"
         
         # Step 4: Update the receipt number
         new_receipt.receipt_no = final_receipt_no
@@ -502,3 +516,227 @@ def get_users_by_role_ids(db_session: Session, role_ids: List[int]) -> List[Dict
         import traceback
         traceback.print_exc()
         return []
+
+
+def get_receipts_for_export(
+    db_session: Session,
+    filters: Optional[ReceiptFilter] = None,
+    user_id: Optional[int] = None,
+    user_roles: Optional[List[str]] = None,
+    pdf: bool = False,
+    csv: bool = False
+):
+    """
+    Get all receipts for PDF/CSV export with same filtering as pagination
+    
+    Args:
+        db_session: Database session
+        filters: Optional filters to apply
+        user_id: Current user ID
+        user_roles: Current user roles
+        pdf: Export as PDF
+        csv: Export as CSV
+        
+    Returns:
+        StreamingResponse with PDF or CSV file
+    """
+    try:
+        # Build base query
+        query = db_session.query(Receipt)
+        
+        # Apply role-based filtering (same logic as get_receipts_paginated)
+        from login.permissions import user_has_permission, Permission as Perm
+        
+        if user_roles:
+            has_read_receipts = user_has_permission(user_roles, Perm.READ_RECEIPTS)
+            is_admin = "admin" in user_roles
+            
+            # receipt_creator can only see their own receipts
+            if not (has_read_receipts or is_admin):
+                if user_id:
+                    query = query.filter(Receipt.created_by == user_id)
+                else:
+                    # No user_id provided and no read permissions - return empty
+                    query = query.filter(Receipt.id == -1)  # No results
+        
+        # Apply filters (same logic as get_receipts_paginated)
+        if filters:
+            if filters.donor_name:
+                query = query.filter(Receipt.donor_name.ilike(f"%{filters.donor_name}%"))
+            
+            if filters.village:
+                query = query.filter(Receipt.village.ilike(f"%{filters.village}%"))
+            
+            if filters.payment_mode:
+                query = query.filter(Receipt.payment_mode.ilike(f"%{filters.payment_mode}%"))
+            
+            if filters.donation1_purpose:
+                query = query.filter(Receipt.donation1_purpose.ilike(f"%{filters.donation1_purpose}%"))
+            
+            if filters.status:
+                query = query.filter(Receipt.status.ilike(f"%{filters.status}%"))
+            
+            if filters.date_from:
+                # Convert date to datetime (start of day)
+                from datetime import time
+                start_datetime = datetime.combine(filters.date_from, time.min)
+                query = query.filter(Receipt.receipt_date >= start_datetime)
+            
+            if filters.date_to:
+                # Convert date to datetime (end of day)
+                from datetime import time
+                end_datetime = datetime.combine(filters.date_to, time.max)
+                query = query.filter(Receipt.receipt_date <= end_datetime)
+            
+            if filters.created_by and user_roles:
+                # Admin and receipt_report_viewer can filter by creator
+                has_read_receipts = user_has_permission(user_roles, Perm.READ_RECEIPTS)
+                is_admin = "admin" in user_roles
+                
+                if has_read_receipts or is_admin:
+                    query = query.filter(Receipt.created_by == filters.created_by)
+        
+        # Get all data for export (ordered by receipt_date descending)
+        receipts = query.order_by(desc(Receipt.receipt_date)).all()
+        
+        if pdf:
+            return generate_receipts_pdf_export(db_session, receipts)
+        elif csv:
+            return generate_receipts_csv_export(db_session, receipts)
+            
+    except Exception as e:
+        print(f"ERROR in get_receipts_for_export: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error generating export")
+
+
+def generate_receipts_pdf_export(db_session: Session, receipts: List[Receipt]):
+    """Generate PDF export of receipts"""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, title="Receipt Report", 
+                          leftMargin=30, rightMargin=30, topMargin=40, bottomMargin=40)
+    elements = []
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        name='TitleStyle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.darkblue,
+        alignment=1,  # centered
+        spaceAfter=20,
+    )
+    
+    # Add title
+    title = Paragraph("Receipt Report", title_style)
+    elements.append(title)
+    elements.append(Spacer(1, 12))
+
+    # Get creator usernames
+    creator_ids = list(set([receipt.created_by for receipt in receipts]))
+    creators_map = get_creators_usernames(db_session, creator_ids)
+
+    # Create table data
+    table_data = [
+        ['Receipt No', 'Date', 'Donor Name', 'Village', 'Payment Mode', 'Purpose', 'Amount', 'Status', 'Created By']
+    ]
+    
+    for receipt in receipts:
+        table_data.append([
+            receipt.receipt_no or '',
+            receipt.receipt_date.strftime('%Y-%m-%d') if receipt.receipt_date else '',
+            receipt.donor_name or '',
+            receipt.village or '',
+            receipt.payment_mode or '',
+            receipt.donation1_purpose or '',
+            f"₹{receipt.total_amount:,.2f}" if receipt.total_amount else '₹0.00',
+            receipt.status or '',
+            creators_map.get(receipt.created_by, f"User{receipt.created_by}")
+        ])
+
+    # Create table
+    table = Table(table_data, colWidths=[0.8*inch, 0.8*inch, 1.2*inch, 1*inch, 0.8*inch, 1.2*inch, 0.8*inch, 0.6*inch, 0.8*inch])
+    
+    # Style the table
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    
+    elements.append(table)
+    
+    # Add summary
+    elements.append(Spacer(1, 20))
+    total_amount = sum(receipt.total_amount or 0 for receipt in receipts)
+    summary_text = f"Total Records: {len(receipts)} | Total Amount: ₹{total_amount:,.2f}"
+    summary = Paragraph(summary_text, styles['Normal'])
+    elements.append(summary)
+
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    return StreamingResponse(
+        buffer, 
+        media_type="application/pdf", 
+        headers={"Content-Disposition": "attachment; filename=receipt_report.pdf"}
+    )
+
+
+def generate_receipts_csv_export(db_session: Session, receipts: List[Receipt]):
+    """Generate CSV export of receipts"""
+    # Get creator usernames
+    creator_ids = list(set([receipt.created_by for receipt in receipts]))
+    creators_map = get_creators_usernames(db_session, creator_ids)
+    
+    # Prepare data for CSV export
+    csv_data = []
+    for receipt in receipts:
+        csv_data.append({
+            "Receipt No": receipt.receipt_no or "",
+            "Receipt Date": receipt.receipt_date.strftime('%Y-%m-%d') if receipt.receipt_date else "",
+            "Donor Name": receipt.donor_name or "",
+            "Village": receipt.village or "",
+            "Residence": receipt.residence or "",
+            "Mobile": receipt.mobile or "",
+            "Relation Address": receipt.relation_address or "",
+            "Payment Mode": receipt.payment_mode or "",
+            "Payment Details": receipt.payment_details or "",
+            "Donation Purpose": receipt.donation1_purpose or "",
+            "Donation Amount": float(receipt.donation1_amount) if receipt.donation1_amount else 0.0,
+            "Additional Amount": float(receipt.donation2_amount) if receipt.donation2_amount else 0.0,
+            "Total Amount": float(receipt.total_amount) if receipt.total_amount else 0.0,
+            "Total Amount Words": receipt.total_amount_words or "",
+            "Status": receipt.status or "",
+            "Created By": creators_map.get(receipt.created_by, f"User{receipt.created_by}"),
+            "Created At": receipt.created_at.strftime('%Y-%m-%d %H:%M:%S') if receipt.created_at else "",
+            "Updated At": receipt.updated_at.strftime('%Y-%m-%d %H:%M:%S') if receipt.updated_at else ""
+        })
+
+    # Create DataFrame and convert to CSV
+    df = pd.DataFrame(csv_data)
+    
+    # Create CSV string buffer
+    csv_buffer = StringIO()
+    df.to_csv(csv_buffer, index=False, encoding='utf-8')
+    csv_buffer.seek(0)
+    
+    # Convert to bytes for streaming response
+    csv_bytes = BytesIO(csv_buffer.getvalue().encode('utf-8'))
+    csv_bytes.seek(0)
+    
+    return StreamingResponse(
+        csv_bytes, 
+        media_type="text/csv", 
+        headers={"Content-Disposition": "attachment; filename=receipt_report.csv"}
+    )

@@ -4,6 +4,7 @@ import { API_URLS } from '../../../utils/fetchurl';
 import StatusOverlay from '../../common/StatusOverlay';
 import { handleAPIError, formatPermissionMessage, isPermissionError } from '../../../utils/errorHandler';
 import axios from 'axios';
+import qs from 'qs';
 import './Reports.css';
 
 const Reports = () => {
@@ -16,6 +17,7 @@ const Reports = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalReceipts, setTotalReceipts] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
+  const [latestTotalCount, setLatestTotalCount] = useState(0); // Latest total count from API
   const itemsPerPage = 15; // More items for reports
 
   // Report view state
@@ -27,6 +29,9 @@ const Reports = () => {
   
   // Dropdown state for created by filter
   const [isCreatedByDropdownOpen, setIsCreatedByDropdownOpen] = useState(false);
+  
+  // Track initial render to prevent duplicate API calls
+  const [isInitialRender, setIsInitialRender] = useState(true);
   
   // Filter states for reports
   const [filters, setFilters] = useState({
@@ -54,7 +59,8 @@ const Reports = () => {
   const [summaryData, setSummaryData] = useState({
     byCreator: [],
     byPaymentMode: [],
-    byPurpose: []
+    byYear: []
+    // byPurpose: [] // Commented out - replaced with byYear
   });
 
   // Overlay state for messages
@@ -126,7 +132,7 @@ const Reports = () => {
       // Determine page size based on filtering needs
       let pageSize = itemsPerPage;
       if (reportView === 'summary') {
-        pageSize = 100; // Max allowed for summary
+        pageSize = 10000; // Get all data for complete summary
       } else if (reportView === 'detailed' && 
                  appliedFilters.created_by.length > 1 && 
                  !appliedFilters.created_by.includes('all')) {
@@ -233,9 +239,13 @@ const Reports = () => {
             !appliedFilters.created_by.includes('all')) {
           setTotalReceipts(receiptsData.length);
           setTotalPages(Math.ceil(receiptsData.length / itemsPerPage));
+          setLatestTotalCount(receiptsData.length); // Update latest total count
+          console.log(`📊 Latest Total Count updated: ${receiptsData.length} (frontend filtered)`)
         } else {
           setTotalReceipts(response.data.total_count);
-          setTotalPages(Math.ceil(response.data.total_count / (reportView === 'summary' ? 100 : itemsPerPage)));
+          setTotalPages(reportView === 'summary' ? 1 : Math.ceil(response.data.total_count / itemsPerPage));
+          setLatestTotalCount(response.data.total_count); // Update latest total count
+          console.log(`📊 Latest Total Count updated: ${response.data.total_count} (from API)`)
         }
         
         // Calculate total amount from actual displayed receipts
@@ -428,7 +438,8 @@ const Reports = () => {
   const calculateSummaryFromReceipts = () => {
     const byCreator = {};
     const byPaymentMode = {};
-    const byPurpose = {};
+    const byYear = {};
+    // const byPurpose = {}; // Commented out - replaced with byYear
 
     console.log('Calculating summary from receipts:', receipts.length);
     console.log('Available users for mapping:', availableUsers);
@@ -454,21 +465,34 @@ const Reports = () => {
       byPaymentMode[paymentMode].count++;
       byPaymentMode[paymentMode].total += receipt.total_amount;
 
-      // By Purpose
-      const purpose = receipt.donation1_purpose || 'Not specified';
-      if (!byPurpose[purpose]) {
-        byPurpose[purpose] = { count: 0, total: 0 };
+      // By Year - extract year from receipt_date
+      const receiptDate = new Date(receipt.receipt_date);
+      const year = receiptDate.getFullYear();
+      const yearKey = isNaN(year) ? 'Unknown Year' : year.toString();
+      
+      if (!byYear[yearKey]) {
+        byYear[yearKey] = { count: 0, total: 0 };
       }
-      byPurpose[purpose].count++;
-      byPurpose[purpose].total += receipt.total_amount;
+      byYear[yearKey].count++;
+      byYear[yearKey].total += receipt.total_amount;
+
+      // By Purpose - Commented out
+      // const purpose = receipt.donation1_purpose || 'Not specified';
+      // if (!byPurpose[purpose]) {
+      //   byPurpose[purpose] = { count: 0, total: 0 };
+      // }
+      // byPurpose[purpose].count++;
+      // byPurpose[purpose].total += receipt.total_amount;
     });
 
     console.log('Summary by creator:', byCreator);
+    console.log('Summary by year:', byYear);
 
     setSummaryData({
       byCreator: Object.entries(byCreator).map(([key, value]) => ({ name: key, ...value })),
       byPaymentMode: Object.entries(byPaymentMode).map(([key, value]) => ({ name: key, ...value })),
-      byPurpose: Object.entries(byPurpose).map(([key, value]) => ({ name: key, ...value }))
+      byYear: Object.entries(byYear).map(([key, value]) => ({ name: key, ...value })).sort((a, b) => b.name.localeCompare(a.name)) // Sort by year descending
+      // byPurpose: Object.entries(byPurpose).map(([key, value]) => ({ name: key, ...value })) // Commented out
     });
   };
 
@@ -496,14 +520,18 @@ const Reports = () => {
     });
   };
 
-  // Load data on component mount
+  // Initial load - load users and initial data
   useEffect(() => {
     loadAvailableUsers();
-    // Load initial data with default filters
     loadReceipts();
   }, []);
 
+  // Load receipts when page, filters, or view changes (excluding initial render)
   useEffect(() => {
+    if (isInitialRender) {
+      setIsInitialRender(false);
+      return; // Skip the first render to avoid duplicate API call
+    }
     loadReceipts();
   }, [currentPage, appliedFilters, reportView]);
 
@@ -639,39 +667,7 @@ const Reports = () => {
 
   // This function is now replaced by handleClearFilters above
 
-  // useEffect to load available users on component mount
-  useEffect(() => {
-    console.log('🔍 ADMIN FILTER DEBUG - Component mounted, loading available users');
-    loadAvailableUsers();
-    
-    // Quick verification of what's actually in the receipts for created_by values
-    verifyReceiptsCreators();
-  }, []);
 
-  // Verification function to check what created_by values exist in receipts
-  const verifyReceiptsCreators = async () => {
-    try {
-      console.log('🔍 VERIFICATION: Checking what created_by values exist in receipts...');
-      const response = await axios.get(`${API_URLS.getAllReceipts()}?page_num=1&page_size=50`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-      });
-      
-      if (response.data.status === 'success' && response.data.data) {
-        const uniqueCreators = [...new Set(response.data.data.map(r => r.created_by))];
-        console.log('🔍 VERIFICATION: Unique created_by values in receipts:', uniqueCreators);
-        
-        // Show sample receipts with their creators
-        const sampleReceipts = response.data.data.slice(0, 10).map(r => ({
-          receipt_no: r.receipt_no,
-          created_by: r.created_by,
-          created_by_username: r.created_by_username
-        }));
-        console.log('🔍 VERIFICATION: Sample receipts with creators:', sampleReceipts);
-      }
-    } catch (error) {
-      console.error('🔍 VERIFICATION: Error checking receipts:', error);
-    }
-  };
 
   // Pagination functions
   const goToPage = (page) => {
@@ -690,163 +686,39 @@ const Reports = () => {
     }
   };
 
-  // Helper function to fetch all matching receipts for export
+
+  // Fetch all receipts for export with proper filtering
   const fetchAllReceiptsForExport = async () => {
     try {
-      setLoading(true);
+      console.log('🔄 Fetching all receipts for export with applied filters...');
       
-      // Use the same filters as current view
-      const apiFilters = {};
+      // Build API filters from applied filters
+      const apiFilters = buildApiFilters(appliedFilters);
       
-      if (appliedFilters.date_from) apiFilters.date_from = appliedFilters.date_from;
-      if (appliedFilters.date_to) apiFilters.date_to = appliedFilters.date_to;
-      if (appliedFilters.payment_mode) apiFilters.payment_mode = appliedFilters.payment_mode;
-      if (appliedFilters.donation_purpose) apiFilters.donation1_purpose = appliedFilters.donation_purpose;
-      if (appliedFilters.village) apiFilters.village = appliedFilters.village;
-      if (appliedFilters.status) apiFilters.status = appliedFilters.status;
-      
-      // Handle creator filtering
-      let shouldFilterCreatorsOnFrontend = false;
-      
-      if (appliedFilters.created_by.length === 1 && !appliedFilters.created_by.includes('all')) {
-        // Single creator - use backend filtering
-        let selectedUserId = appliedFilters.created_by[0];
-        
-        if (isNaN(selectedUserId)) {
-          const selectedUser = availableUsers.find(u => 
-            u.display_name === selectedUserId || u.username === selectedUserId
-          );
-          if (selectedUser) {
-            selectedUserId = selectedUser.id;
-          }
-        }
-        
-        apiFilters.created_by = parseInt(selectedUserId);
-      } else if (appliedFilters.created_by.length > 1 && !appliedFilters.created_by.includes('all')) {
-        // Multiple creators - we'll filter on frontend after getting results
-        shouldFilterCreatorsOnFrontend = true;
-      }
-
-      // Use a conservative page_size that backend can definitely handle
-      const maxPageSize = 100; // Conservative limit for testing
+      // Use single API call to get all filtered data (no pagination for export)
       const queryParams = new URLSearchParams({
         page_num: 1,
-        page_size: maxPageSize,
+        page_size: 10000, // Large page size to get all data (not latestTotalCount as it may be filtered)
         ...apiFilters
-      }).toString();
+      });
 
-      console.log('🔄 Fetching all receipts for export with filters:', apiFilters);
-      console.log('🔄 API URL:', API_URLS.getAllReceipts());
-      
-      // Fetch all matching receipts using pagination
-      let allReceipts = [];
-      let currentPage = 1;
-      let totalPages = 1;
-      let totalRecords = 0;
-      let maxRetries = 10; // Safety limit to prevent infinite loops
-      
-      do {
-        if (currentPage > maxRetries) {
-          console.error(`❌ Export stopped: Exceeded max retry limit of ${maxRetries} pages`);
-          throw new Error('Export failed: Too many pages. Please apply more specific filters.');
-        }
-        
-        // Additional safety check - if we already have all expected records, stop
-        if (totalRecords > 0 && allReceipts.length >= totalRecords) {
-          console.log(`✅ Already collected all ${totalRecords} records, stopping pagination`);
-          break;
-        }
-        
-        const currentQueryParams = new URLSearchParams({
-          page_num: currentPage,
-          page_size: maxPageSize,
-          ...apiFilters
-        }).toString();
-        
-        console.log(`📄 Fetching export page ${currentPage}/${totalPages} with query: ${currentQueryParams}`);
-        
-        try {
-          const response = await axios.get(`${API_URLS.getAllReceipts()}?${currentQueryParams}`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-            },
-            timeout: 30000 // 30 second timeout
-          });
+      console.log('📊 Export API filters:', apiFilters);
+      console.log('📊 Export query params:', queryParams.toString());
 
-          console.log(`📊 Response status: ${response.status}, data status: ${response.data?.status}`);
-          
-          // Check for graceful permission error FIRST
-          if (response.data.status === 'error' && response.data.error_code === 'PERMISSION_DENIED') {
-            throw new Error('Permission denied: You do not have access to export receipts');
-          }
+      const response = await axios.get(`${API_URLS.getAllReceipts()}?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        timeout: 60000 // 60 second timeout for exports
+      });
 
-          if (response.data.status === 'success') {
-            // Add receipts from current page
-            const pageData = response.data.data || [];
-            
-            // If we get an empty page, we're done
-            if (pageData.length === 0) {
-              console.log(`📄 Page ${currentPage} returned 0 records, reached end of data`);
-              break;
-            }
-            
-            allReceipts = allReceipts.concat(pageData);
-            
-            console.log(`📄 Page ${currentPage}: ${pageData.length} receipts (Total so far: ${allReceipts.length})`);
-            
-            // Update pagination info for first request
-            if (currentPage === 1) {
-              totalRecords = response.data.total_count || response.data.total_receipts || 0;
-              totalPages = totalRecords > 0 ? Math.ceil(totalRecords / maxPageSize) : 1;
-              console.log(`📊 Total filtered records available: ${totalRecords}, Will fetch ${totalPages} pages`);
-              
-              // Sanity check
-              if (totalPages > maxRetries) {
-                console.warn(`⚠️ Large export: ${totalPages} pages (${totalRecords} records). This may take a while.`);
-              }
-              
-              // If we have very few records, we might be done already
-              if (totalRecords <= maxPageSize) {
-                console.log(`📊 Small dataset detected: ${totalRecords} records fit in one page`);
-              }
-            }
-            
-            // If this page returned fewer records than page_size, we've reached the end
-            if (pageData.length < maxPageSize) {
-              console.log(`📄 Page ${currentPage} returned ${pageData.length} records (less than ${maxPageSize}), reached end of data`);
-              break;
-            }
-            
-            // Also break if we've collected all the records we expect
-            if (totalRecords > 0 && allReceipts.length >= totalRecords) {
-              console.log(`📄 Collected all expected records: ${allReceipts.length}/${totalRecords}`);
-              break;
-            }
-            
-            currentPage++;
-          } else {
-            throw new Error(`API returned error status: ${response.data.status} - ${response.data.message || 'Unknown error'}`);
-          }
-          
-        } catch (requestError) {
-          console.error(`❌ Error fetching page ${currentPage}:`, requestError);
-          
-          if (requestError.response) {
-            console.error(`HTTP ${requestError.response.status}: ${requestError.response.statusText}`);
-            console.error('Response data:', requestError.response.data);
-          }
-          
-          throw new Error(`Failed to fetch export data on page ${currentPage}: ${requestError.message}`);
-        }
+      if (response.data.status === 'success') {
+        let allReceipts = response.data.data || [];
         
-      } while (currentPage <= totalPages);
-      
-      console.log(`✅ Export fetch completed: ${allReceipts.length} receipts from ${currentPage - 1} pages`);
-
-      if (allReceipts.length > 0) {
+        console.log(`📊 Fetched ${allReceipts.length} receipts for export`);
         
         // Apply frontend filtering for multiple creators if needed
-        if (shouldFilterCreatorsOnFrontend) {
+        if (appliedFilters.created_by.length > 1 && !appliedFilters.created_by.includes('all')) {
           const creatorIds = appliedFilters.created_by.map(filterValue => {
             if (!isNaN(filterValue)) {
               return parseInt(filterValue);
@@ -862,160 +734,149 @@ const Reports = () => {
           allReceipts = allReceipts.filter(receipt => 
             creatorIds.includes(receipt.created_by)
           );
+          
+          console.log(`🔍 Frontend filtering applied: ${allReceipts.length} receipts after multiple creator filter`);
         }
         
-        console.log(`✅ Fetched ${allReceipts.length} receipts for export`);
         return allReceipts;
       } else {
         throw new Error('Failed to fetch receipts for export');
       }
     } catch (error) {
-      console.error('❌ Primary export method failed:', error);
+      console.error('❌ Error fetching receipts for export:', error);
+      throw error;
+    }
+  };
+
+  // Smart export function - exports current filtered data with original format
+  const exportToCSV = async () => {
+    try {
+      console.log('🔄 Starting CSV export with original format...');
       
-      // Fallback: Try to export just the current page data
-      console.log('🔄 Attempting fallback export with current page data...');
+      // Determine if filters are applied
+      const hasFilters = appliedFilters.date_from || appliedFilters.date_to || appliedFilters.payment_mode || 
+                        appliedFilters.donation_purpose || appliedFilters.village || appliedFilters.status ||
+                        (appliedFilters.created_by.length > 0 && !appliedFilters.created_by.includes('all'));
       
-      try {
-        if (receipts && receipts.length > 0) {
-          console.log(`📄 Using fallback: exporting ${receipts.length} receipts from current page`);
-          setOverlayState({
-            isVisible: true,
-            message: `Export limited to current page (${receipts.length} receipts). Apply filters to reduce data size.`,
-            isError: false,
-            errorType: "general",
-            pendingAction: null
-          });
-          
-          // Auto-hide message after 5 seconds
-          setTimeout(() => {
-            setOverlayState(prev => ({ ...prev, isVisible: false }));
-          }, 5000);
-          
-          return receipts; // Return current page data
-        } else {
-          throw new Error('No receipts available for export');
-        }
-      } catch (fallbackError) {
-        console.error('❌ Fallback export also failed:', fallbackError);
+      const exportType = hasFilters ? 'filtered' : 'all';
+      console.log(`📊 Starting CSV export (${exportType} data)...`);
+      
+      const allReceipts = await fetchAllReceiptsForExport();
+      
+      if (!allReceipts || allReceipts.length === 0) {
+        console.warn('❌ No receipts to export');
         setOverlayState({
           isVisible: true,
-          message: "Failed to export receipts. Please try applying more specific filters or contact support.",
+          message: 'No receipts found to export with current filters',
           isError: true,
           errorType: "general",
           pendingAction: null
         });
-        return null;
+        return;
       }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Smart export function - exports current filtered data or all data
-  const exportToCSV = async () => {
-    // Determine if filters are applied
-    const hasFilters = appliedFilters.date_from || appliedFilters.date_to || appliedFilters.payment_mode || 
-                      appliedFilters.donation_purpose || appliedFilters.village || appliedFilters.status ||
-                      (appliedFilters.created_by.length > 0 && !appliedFilters.created_by.includes('all'));
-    
-    const exportType = hasFilters ? 'filtered' : 'all';
-    console.log(`🔄 Starting CSV export (${exportType} data)...`);
-    console.log('Applied filters:', {
-      date_from: appliedFilters.date_from,
-      date_to: appliedFilters.date_to,
-      payment_mode: appliedFilters.payment_mode,
-      donation_purpose: appliedFilters.donation_purpose,
-      village: appliedFilters.village,
-      status: appliedFilters.status,
-      created_by: appliedFilters.created_by
-    });
-    
-    const allReceipts = await fetchAllReceiptsForExport();
-    
-    if (!allReceipts || allReceipts.length === 0) {
-      console.warn('❌ No receipts to export');
-      return;
-    }
-    
-    console.log(`✅ Exporting ${allReceipts.length} receipts to CSV`);
-    
-    const csvData = allReceipts.map(receipt => ({
-      'Receipt No': receipt.receipt_no,
-      'Date': formatDate(receipt.receipt_date),
-      'Donor Name': receipt.donor_name,
-      'Village': receipt.village || '',
-      'Residence': receipt.residence || '',
-      'Mobile': receipt.mobile || '',
-      'Payment Mode': receipt.payment_mode,
-      'Donation Purpose': receipt.donation1_purpose || '',
-      'Donation 1': receipt.donation1_amount || 0,
-      'Donation 2': receipt.donation2_amount || 0,
-      'Total Amount': receipt.total_amount,
-      'Status': receipt.status,
-      'Created By': getCreatorDisplayName(receipt.created_by, receipt)
-    }));
-
-    // Calculate totals from all receipts
-    const totalDonation1 = allReceipts.reduce((sum, receipt) => sum + (receipt.donation1_amount || 0), 0);
-    const totalDonation2 = allReceipts.reduce((sum, receipt) => sum + (receipt.donation2_amount || 0), 0);
-    const grandTotal = allReceipts.reduce((sum, receipt) => sum + (receipt.total_amount || 0), 0);
-
-    // Add summary rows
-    const summaryTitle = hasFilters ? 'FILTERED SUMMARY' : 'TOTAL SUMMARY';
-    const recordsLabel = hasFilters ? `Total Filtered Records: ${allReceipts.length}` : `Total Records: ${allReceipts.length}`;
-    
-    const summaryData = [
-      {},
-      { 'Receipt No': summaryTitle, 'Donor Name': recordsLabel },
-      { 'Receipt No': 'TOTALS', 'Donation Purpose': 'Total Donation 1:', 'Donation 1': totalDonation1 },
-      { 'Receipt No': '', 'Donation Purpose': 'Total Donation 2:', 'Donation 2': totalDonation2 },
-      { 'Receipt No': '', 'Donation Purpose': 'GRAND TOTAL:', 'Total Amount': grandTotal }
-    ];
-
-    const allData = [...csvData, ...summaryData];
-    const headers = Object.keys(csvData[0]);
-    
-    const csvContent = [
-      headers.join(','),
-      ...allData.map(row => headers.map(header => `"${row[header] || ''}"`).join(','))
-    ].join('\n');
-
-    // Download CSV
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    const filename = hasFilters 
-      ? `receipts_filtered_${new Date().toISOString().split('T')[0]}.csv`
-      : `receipts_all_${new Date().toISOString().split('T')[0]}.csv`;
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    console.log(`✅ CSV export completed: ${allReceipts.length} records exported`);
-    
-    // Show success message
-    const exportInfo = hasFilters 
-      ? `CSV export completed! Exported ${allReceipts.length} filtered records.`
-      : `CSV export completed! Exported all ${allReceipts.length} records.`;
       
-    setOverlayState({
-      isVisible: true,
-      message: exportInfo,
-      isError: false,
-      errorType: "general",
-      pendingAction: null
-    });
+      console.log(`✅ Exporting ${allReceipts.length} receipts to CSV`);
+      
+      // Create CSV data with original format
+      const csvData = allReceipts.map(receipt => ({
+        'Receipt No': receipt.receipt_no,
+        'Date': formatDate(receipt.receipt_date),
+        'Donor Name': receipt.donor_name,
+        'Village': receipt.village || '',
+        'Residence': receipt.residence || '',
+        'Mobile': receipt.mobile || '',
+        'Payment Mode': receipt.payment_mode,
+        'Donation Purpose': receipt.donation1_purpose || '',
+        'Donation 1': receipt.donation1_amount || 0,
+        'Donation 2': receipt.donation2_amount || 0,
+        'Total Amount': receipt.total_amount,
+        'Status': receipt.status,
+        'Created By': getCreatorDisplayName(receipt.created_by, receipt)
+      }));
 
-    // Auto-hide after 3 seconds
-    setTimeout(() => {
-      setOverlayState(prev => ({ ...prev, isVisible: false }));
-    }, 3000);
+      // Calculate totals from all receipts
+      const totalDonation1 = allReceipts.reduce((sum, receipt) => sum + (receipt.donation1_amount || 0), 0);
+      const totalDonation2 = allReceipts.reduce((sum, receipt) => sum + (receipt.donation2_amount || 0), 0);
+      const grandTotal = allReceipts.reduce((sum, receipt) => sum + (receipt.total_amount || 0), 0);
+
+      // Add summary rows
+      const summaryTitle = hasFilters ? 'FILTERED SUMMARY' : 'TOTAL SUMMARY';
+      const recordsLabel = hasFilters ? `Total Filtered Records: ${allReceipts.length}` : `Total Records: ${allReceipts.length}`;
+      
+      const summaryData = [
+        {},
+        { 'Receipt No': summaryTitle, 'Donor Name': recordsLabel },
+        { 'Receipt No': 'TOTALS', 'Donation Purpose': 'Total Donation 1:', 'Donation 1': totalDonation1 },
+        { 'Receipt No': '', 'Donation Purpose': 'Total Donation 2:', 'Donation 2': totalDonation2 },
+        { 'Receipt No': '', 'Donation Purpose': 'GRAND TOTAL:', 'Total Amount': grandTotal }
+      ];
+
+      const allData = [...csvData, ...summaryData];
+      const headers = Object.keys(csvData[0]);
+      
+      const csvContent = [
+        headers.join(','),
+        ...allData.map(row => headers.map(header => `"${row[header] || ''}"`).join(','))
+      ].join('\n');
+
+      // Download CSV
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      const filename = hasFilters 
+        ? `receipts_filtered_${new Date().toISOString().split('T')[0]}.csv`
+        : `receipts_all_${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log(`✅ CSV export completed: ${allReceipts.length} records exported`);
+      
+      // Show success message
+      const exportInfo = hasFilters 
+        ? `CSV export completed! Exported ${allReceipts.length} filtered records.`
+        : `CSV export completed! Exported all ${allReceipts.length} records.`;
+        
+      setOverlayState({
+        isVisible: true,
+        message: exportInfo,
+        isError: false,
+        errorType: "general",
+        pendingAction: null
+      });
+
+      // Hide overlay after 3 seconds
+      setTimeout(() => {
+        setOverlayState(prev => ({ ...prev, isVisible: false }));
+      }, 3000);
+
+    } catch (error) {
+      console.error('CSV Export Error:', error);
+      let errorMessage = 'CSV Export failed';
+      
+      if (error.response?.status === 403) {
+        errorMessage = 'Permission denied: You do not have access to export receipts';
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Export timeout: The export is taking too long. Please try with more specific filters.';
+      } else if (error.message) {
+        errorMessage = `CSV Export failed: ${error.message}`;
+      }
+      
+      setOverlayState({
+        isVisible: true,
+        message: `❌ ${errorMessage}`,
+        isError: true,
+        errorType: "general",
+        pendingAction: null
+      });
+      setTimeout(() => setOverlayState(prev => ({ ...prev, isVisible: false })), 5000);
+    }
   };
 
-  // Smart PDF export function - exports current filtered data or all data
+  // Smart PDF export function - exports current filtered data with original format
   const exportToPDF = async () => {
     try {
       // Determine if filters are applied
@@ -1030,6 +891,13 @@ const Reports = () => {
       
       if (!allReceipts || allReceipts.length === 0) {
         console.warn('❌ No receipts to export to PDF');
+        setOverlayState({
+          isVisible: true,
+          message: 'No receipts found to export with current filters',
+          isError: true,
+          errorType: "general",
+          pendingAction: null
+        });
         return;
       }
       
@@ -1040,7 +908,7 @@ const Reports = () => {
       const totalDonation2 = allReceipts.reduce((sum, receipt) => sum + (receipt.donation2_amount || 0), 0);
       const grandTotal = allReceipts.reduce((sum, receipt) => sum + (receipt.total_amount || 0), 0);
 
-      // Create HTML content for PDF
+      // Create HTML content for PDF with original format
       const htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -1204,314 +1072,103 @@ const Reports = () => {
       const printWindow = window.open('', '_blank');
       
       if (!printWindow) {
-        throw new Error('Unable to open print window. Please check if popup blockers are enabled and allow popups for this site.');
-      }
-      
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      
-      // Wait for content to load then print
-      printWindow.onload = () => {
-        printWindow.print();
-        // Close window after printing
-        printWindow.onafterprint = () => {
-          printWindow.close();
-        };
-      };
-
-      // Show success message with export info
-      const exportInfo = hasFilters 
-        ? `PDF export initiated for ${allReceipts.length} filtered records! Please check your browser's print dialog.`
-        : `PDF export initiated for all ${allReceipts.length} records! Please check your browser's print dialog.`;
+        console.warn('Popup blocked, trying alternative PDF export method...');
+        try {
+          // Fallback: Blob URL in new tab
+          const blob = new Blob([htmlContent], { type: 'text/html' });
+          const url = URL.createObjectURL(blob);
+          const newTab = window.open(url, '_blank');
+          if (!newTab) {
+            throw new Error('Unable to open new tab. Please check popup blockers.');
+          }
+          setTimeout(() => { URL.revokeObjectURL(url); }, 1000);
+          
+          setOverlayState({
+            isVisible: true,
+            message: `PDF export opened in new tab! Use your browser's print function to save as PDF. (${allReceipts.length} records)`,
+            isError: false,
+            errorType: "general",
+            pendingAction: null
+          });
+        } catch (fallbackError) {
+          console.error('Fallback PDF export failed:', fallbackError);
+          // Final fallback: download HTML file
+          const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `receipt-report-${new Date().toISOString().split('T')[0]}.html`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          
+          setOverlayState({
+            isVisible: true,
+            message: `Report downloaded as HTML file! Open it in your browser and use Ctrl+P to print/save as PDF. (${allReceipts.length} records)`,
+            isError: false,
+            errorType: "general",
+            pendingAction: null
+          });
+        }
+      } else {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
         
-      setOverlayState({
-        isVisible: true,
-        message: exportInfo,
-        isError: false,
-        errorType: "general",
-        pendingAction: null
-      });
+        // Wait for content to load then print
+        printWindow.onload = () => {
+          printWindow.print();
+          // Close window after printing
+          printWindow.onafterprint = () => {
+            printWindow.close();
+          };
+        };
 
-      // Auto-hide overlay after 3 seconds
-      setTimeout(() => {
+        // Show success message with export info
+        const exportInfo = hasFilters 
+          ? `PDF export initiated for ${allReceipts.length} filtered records! Please check your browser's print dialog.`
+          : `PDF export initiated for all ${allReceipts.length} records! Please check your browser's print dialog.`;
+          
         setOverlayState({
-          isVisible: false,
-          message: "",
+          isVisible: true,
+          message: exportInfo,
           isError: false,
           errorType: "general",
           pendingAction: null
         });
-      }, 3000);
+
+        // Auto-hide overlay after 3 seconds
+        setTimeout(() => {
+          setOverlayState({
+            isVisible: false,
+            message: "",
+            isError: false,
+            errorType: "general",
+            pendingAction: null
+          });
+        }, 3000);
+      }
 
     } catch (error) {
       console.error('PDF Export Error:', error);
+      let errorMessage = 'PDF Export failed';
       
-      // Check if it's a popup blocker issue
-      if (error.message.includes('popup blockers')) {
-        setOverlayState({
-          isVisible: true,
-          message: "PDF export blocked by popup blocker. Please allow popups for this site and try again, or use CSV export instead.",
-          isError: true,
-          errorType: "general",
-          pendingAction: null
-        });
-      } else {
-        // Try alternative method - create a printable page in the same window
-        try {
-          console.log('🔄 Trying alternative PDF export method...');
-          exportToPDFAlternative();
-        } catch (altError) {
-          console.error('Alternative PDF Export Error:', altError);
-          
-          // Final fallback - download as HTML file
-          try {
-            console.log('🔄 Trying final fallback - HTML download...');
-            downloadReportAsHTML();
-          } catch (htmlError) {
-            console.error('HTML Download Error:', htmlError);
-            setOverlayState({
-              isVisible: true,
-              message: "Failed to export PDF. Please try using CSV export instead or check your browser settings.",
-              isError: true,
-              errorType: "general",
-              pendingAction: null
-            });
-          }
-        }
+      if (error.response?.status === 403) {
+        errorMessage = 'Permission denied: You do not have access to export receipts';
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Export timeout: The export is taking too long. Please try with more specific filters.';
+      } else if (error.message) {
+        errorMessage = `PDF Export failed: ${error.message}`;
       }
-    }
-  };
-
-  // Alternative PDF export method - opens in same window
-  const exportToPDFAlternative = async () => {
-    try {
-      const allReceipts = await fetchAllReceiptsForExport();
       
-      if (!allReceipts || allReceipts.length === 0) {
-        throw new Error('No receipts to export');
-      }
-
-      // Calculate totals
-      const totalDonation1 = allReceipts.reduce((sum, receipt) => sum + (receipt.donation1_amount || 0), 0);
-      const totalDonation2 = allReceipts.reduce((sum, receipt) => sum + (receipt.donation2_amount || 0), 0);
-      const grandTotal = allReceipts.reduce((sum, receipt) => sum + (receipt.total_amount || 0), 0);
-
-      // Create HTML content for PDF
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Receipt Report - ${new Date().toLocaleDateString()}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .filters { margin-bottom: 20px; padding: 10px; background: #f5f5f5; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
-            th { background-color: #f2f2f2; font-weight: bold; }
-            .totals { margin-top: 20px; font-weight: bold; }
-            .cancelled-row { background-color: #f8d7da; }
-            @media print {
-              body { margin: 0; }
-              .no-print { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>Receipt Report</h1>
-            <p>Generated on: ${new Date().toLocaleString()}</p>
-            <p>Total Records: ${allReceipts.length}</p>
-          </div>
-          
-          <div class="filters">
-            <p><strong>Filters Applied:</strong> ${getActiveFiltersText()}</p>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>Receipt No</th>
-                <th>Date</th>
-                <th>Donor Name</th>
-                <th>Village</th>
-                <th>Payment Mode</th>
-                <th>Purpose</th>
-                <th>Total Amount</th>
-                <th>Status</th>
-                <th>Created By</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${allReceipts.map(receipt => `
-                <tr class="${receipt.status === 'cancelled' ? 'cancelled-row' : ''}">
-                  <td>${receipt.receipt_no}</td>
-                  <td>${formatDate(receipt.receipt_date)}</td>
-                  <td>${receipt.donor_name}</td>
-                  <td>${receipt.village || '-'}</td>
-                  <td>${receipt.payment_mode}</td>
-                  <td>${receipt.donation1_purpose || '-'}</td>
-                  <td>${formatCurrency(receipt.total_amount || 0)}</td>
-                  <td>${receipt.status}</td>
-                  <td>${getCreatorDisplayName(receipt.created_by, receipt)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-
-          <div class="totals">
-            <p>Total Donation 1: ${formatCurrency(totalDonation1)}</p>
-            <p>Total Donation 2: ${formatCurrency(totalDonation2)}</p>
-            <p><strong>Grand Total: ${formatCurrency(grandTotal)}</strong></p>
-          </div>
-
-          <div class="no-print" style="margin-top: 30px; text-align: center;">
-            <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
-              Print / Save as PDF
-            </button>
-            <button onclick="window.close()" style="padding: 10px 20px; font-size: 16px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
-              Close
-            </button>
-          </div>
-        </body>
-        </html>
-      `;
-
-      // Create a blob and open it in a new tab
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const newTab = window.open(url, '_blank');
-      
-      if (!newTab) {
-        throw new Error('Unable to open new tab. Please check popup blockers.');
-      }
-
-      // Clean up the URL after a delay
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-      }, 1000);
-
       setOverlayState({
         isVisible: true,
-        message: `PDF export opened in new tab! Use your browser's print function to save as PDF. (${allReceipts.length} records)`,
-        isError: false,
+        message: `❌ ${errorMessage}`,
+        isError: true,
         errorType: "general",
         pendingAction: null
       });
-
-      setTimeout(() => {
-        setOverlayState(prev => ({ ...prev, isVisible: false }));
-      }, 5000);
-
-    } catch (error) {
-      console.error('Alternative PDF Export Error:', error);
-      throw error;
-    }
-  };
-
-  // Final fallback - download report as HTML file
-  const downloadReportAsHTML = async () => {
-    try {
-      const allReceipts = await fetchAllReceiptsForExport();
-      
-      if (!allReceipts || allReceipts.length === 0) {
-        throw new Error('No receipts to export');
-      }
-
-      // Calculate totals
-      const totalDonation1 = allReceipts.reduce((sum, receipt) => sum + (receipt.donation1_amount || 0), 0);
-      const totalDonation2 = allReceipts.reduce((sum, receipt) => sum + (receipt.donation2_amount || 0), 0);
-      const grandTotal = allReceipts.reduce((sum, receipt) => sum + (receipt.total_amount || 0), 0);
-
-      const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <title>Receipt Report - ${new Date().toLocaleDateString()}</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    .header { text-align: center; margin-bottom: 30px; }
-    .filters { margin-bottom: 20px; padding: 10px; background: #f5f5f5; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
-    th { background-color: #f2f2f2; font-weight: bold; }
-    .totals { margin-top: 20px; font-weight: bold; }
-    .cancelled-row { background-color: #f8d7da; }
-    @media print { body { margin: 0; } .no-print { display: none; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>Receipt Report</h1>
-    <p>Generated on: ${new Date().toLocaleString()}</p>
-    <p>Total Records: ${allReceipts.length}</p>
-  </div>
-  
-  <div class="filters">
-    <p><strong>Filters Applied:</strong> ${getActiveFiltersText()}</p>
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th>Receipt No</th><th>Date</th><th>Donor Name</th><th>Village</th>
-        <th>Payment Mode</th><th>Purpose</th><th>Total Amount</th><th>Status</th><th>Created By</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${allReceipts.map(receipt => `
-        <tr class="${receipt.status === 'cancelled' ? 'cancelled-row' : ''}">
-          <td>${receipt.receipt_no}</td>
-          <td>${formatDate(receipt.receipt_date)}</td>
-          <td>${receipt.donor_name}</td>
-          <td>${receipt.village || '-'}</td>
-          <td>${receipt.payment_mode}</td>
-          <td>${receipt.donation1_purpose || '-'}</td>
-          <td>${formatCurrency(receipt.total_amount || 0)}</td>
-          <td>${receipt.status}</td>
-          <td>${getCreatorDisplayName(receipt.created_by, receipt)}</td>
-        </tr>
-      `).join('')}
-    </tbody>
-  </table>
-
-  <div class="totals">
-    <p>Total Donation 1: ${formatCurrency(totalDonation1)}</p>
-    <p>Total Donation 2: ${formatCurrency(totalDonation2)}</p>
-    <p><strong>Grand Total: ${formatCurrency(grandTotal)}</strong></p>
-  </div>
-
-  <div class="no-print" style="margin-top: 30px; text-align: center;">
-    <p>Open this file in your browser and use Ctrl+P (Cmd+P on Mac) to print or save as PDF</p>
-  </div>
-</body>
-</html>`;
-
-      // Create and download the HTML file
-      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `receipt-report-${new Date().toISOString().split('T')[0]}.html`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      setOverlayState({
-        isVisible: true,
-        message: `Report downloaded as HTML file! Open it in your browser and use Ctrl+P to print/save as PDF. (${allReceipts.length} records)`,
-        isError: false,
-        errorType: "general",
-        pendingAction: null
-      });
-
-      setTimeout(() => {
-        setOverlayState(prev => ({ ...prev, isVisible: false }));
-      }, 7000);
-
-    } catch (error) {
-      console.error('HTML Download Error:', error);
-      throw error;
+      setTimeout(() => setOverlayState(prev => ({ ...prev, isVisible: false })), 5000);
     }
   };
 
@@ -1526,6 +1183,41 @@ const Reports = () => {
     } else {
       return `Export all data (${totalReceipts} records)`;
     }
+  };
+
+  // Helper function to build API filters from applied filters
+  const buildApiFilters = (filters) => {
+    const apiFilters = {};
+    
+    // Handle date range
+    if (filters.date_from) apiFilters.date_from = filters.date_from;
+    if (filters.date_to) apiFilters.date_to = filters.date_to;
+    
+    // Handle other filters
+    if (filters.payment_mode) apiFilters.payment_mode = filters.payment_mode;
+    if (filters.donation_purpose) apiFilters.donation1_purpose = filters.donation_purpose;
+    if (filters.village) apiFilters.village = filters.village;
+    if (filters.status) apiFilters.status = filters.status;
+    
+    // Handle creator filtering - only single creator for backend API
+    if (filters.created_by.length === 1 && !filters.created_by.includes('all')) {
+      let selectedUserId = filters.created_by[0];
+      
+      // If the filter value is not a number, find the corresponding user ID
+      if (isNaN(selectedUserId)) {
+        const selectedUser = availableUsers.find(u => 
+          u.display_name === selectedUserId || u.username === selectedUserId
+        );
+        if (selectedUser) {
+          selectedUserId = selectedUser.id;
+        }
+      }
+      
+      apiFilters.created_by = parseInt(selectedUserId);
+    }
+    // Note: Multiple creators will be handled by frontend filtering if needed
+    
+    return apiFilters;
   };
 
   // Helper function to get active filters text
@@ -1578,13 +1270,19 @@ const Reports = () => {
         <div className="report-view-tabs">
           <button 
             className={`tab-btn ${reportView === 'detailed' ? 'active' : ''}`}
-            onClick={() => setReportView('detailed')}
+            onClick={() => {
+              setReportView('detailed');
+              setCurrentPage(1);
+            }}
           >
             📋 Detailed View
           </button>
           <button 
             className={`tab-btn ${reportView === 'summary' ? 'active' : ''}`}
-            onClick={() => setReportView('summary')}
+            onClick={() => {
+              setReportView('summary');
+              setCurrentPage(1);
+            }}
           >
             📈 Summary Reports
           </button>
@@ -1864,18 +1562,13 @@ const Reports = () => {
                 </div>
                 <div className="stat-item">
                   <span className="stat-value">{formatCurrency(totalAmount)}</span>
-                  <span className="stat-label">Sample Amount*</span>
+                  <span className="stat-label">Total Amount*</span>
                 </div>
                 <div className="stat-item">
                   <span className="stat-value">{availableUsers.length}</span>
                   <span className="stat-label">Active Creators</span>
                 </div>
               </div>
-              {totalReceipts > 100 && (
-                <div className="summary-note">
-                  <small>* Showing amount from first 100 receipts. Summary calculations based on available sample data.</small>
-                </div>
-              )}
             </div>
           </div>
 
@@ -1930,7 +1623,33 @@ const Reports = () => {
               </div>
             </div>
 
-            {/* By Purpose Summary */}
+            {/* By Year Summary */}
+            <div className="summary-card">
+              <h3>📅 By Year</h3>
+              <div className="summary-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Year</th>
+                      <th>Count</th>
+                      <th>Total Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summaryData.byYear.map((item, index) => (
+                      <tr key={index}>
+                        <td>{item.name}</td>
+                        <td>{item.count}</td>
+                        <td>{formatCurrency(item.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* By Purpose Summary - Commented out */}
+            {/* 
             <div className="summary-card">
               <h3>🎯 By Purpose</h3>
               <div className="summary-table">
@@ -1954,6 +1673,7 @@ const Reports = () => {
                 </table>
               </div>
             </div>
+            */}
 
           </div>
         </div>

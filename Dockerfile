@@ -17,15 +17,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend requirements file
-COPY backend/req.txt .
+# Copy requirements file first (for better layer caching)
+COPY backend/req.txt /app/requirements.txt
 
 # Install Python dependencies
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install -r req.txt
+    pip install -r /app/requirements.txt
 
 # Copy backend application code
-COPY backend/ .
+COPY backend/ /app/
 
 # Expose port (Railway will assign PORT env variable)
 EXPOSE 8000

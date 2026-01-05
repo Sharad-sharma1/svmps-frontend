@@ -66,7 +66,7 @@ const CreateReceipt = () => {
     paymentMode: '',
     paymentDetails: '',
     donation1Purpose: '',
-    donation1PurposeNumber: '', // New field for input number
+    donation1PurposeNumber: '', // New field for number input
     donation1PurposeType: '', // New field for dropdown
     donation1: '',
     donation2: '',
@@ -147,7 +147,7 @@ const CreateReceipt = () => {
 
   // Auto-concatenate donation1Purpose from number + "th" + type
   useEffect(() => {
-    const { donation1PurposeNumber, donation1PurposeType, donation1Purpose } = receiptData;
+    const { donation1PurposeNumber, donation1PurposeType } = receiptData;
     let concatenated = '';
     
     if (donation1PurposeNumber && donation1PurposeType) {
@@ -159,13 +159,13 @@ const CreateReceipt = () => {
     }
     
     // Only update if the concatenated value is different from current
-    if (concatenated !== donation1Purpose) {
+    if (concatenated !== receiptData.donation1Purpose) {
       setReceiptData(prev => ({
         ...prev,
         donation1Purpose: concatenated
       }));
     }
-  }, [receiptData.donation1PurposeNumber, receiptData.donation1PurposeType, receiptData.donation1Purpose]);
+  }, [receiptData.donation1PurposeNumber, receiptData.donation1PurposeType]);
 
   // Auto-calculate total when donations change
   useEffect(() => {
@@ -910,7 +910,7 @@ const CreateReceipt = () => {
                     name="donation1PurposeNumber"
                     value={receiptData.donation1PurposeNumber}
                     onChange={handleInputChange}
-                    placeholder="No."
+                    placeholder="Number"
                     readOnly={isPreviewMode}
                     style={{width: '60px', marginRight: '5px'}}
                   />
